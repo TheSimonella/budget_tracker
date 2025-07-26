@@ -189,6 +189,20 @@
     </div>
 </div>
 
+<!-- Fund Expenses -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-piggy-bank text-primary"></i> Fund Contributions
+        </h5>
+    </div>
+    <div class="card-body">
+        <div id="fundCategories">
+            <!-- Fund categories will be loaded here -->
+        </div>
+    </div>
+</div>
+
 <!-- Budget Comparison -->
 <div class="card">
     <div class="card-header">
@@ -252,10 +266,12 @@
             const incomeCategories = data.filter(c => c.type === 'income' && !c.name.toLowerCase().includes('deduction'));
             const deductionCategories = data.filter(c => c.type === 'income' && c.name.toLowerCase().includes('deduction'));
             const expenseCategories = data.filter(c => c.type === 'expense');
-            
+            const fundCategories = data.filter(c => c.type === 'fund');
+
             displayCategories(incomeCategories, 'incomeCategories');
             displayCategories(deductionCategories, 'deductionCategories');
             displayCategories(expenseCategories, 'expenseCategories');
+            displayCategories(fundCategories, 'fundCategories');
         });
     }
     
@@ -283,6 +299,7 @@
             // Separate by type
             const incomeItems = data.filter(item => item.type === 'income');
             const expenseItems = data.filter(item => item.type === 'expense');
+            const fundItems = data.filter(item => item.type === 'fund');
             
             // Income section
             if (incomeItems.length > 0) {
@@ -312,6 +329,26 @@
                     const statusBadge = item.status === 'over' ? 'badge-danger' : 'badge-success';
                     const statusText = item.status === 'over' ? 'Over Budget' : 'Under Budget';
                     
+                    comparisonHtml += `
+                        <tr>
+                            <td>${item.category}</td>
+                            <td class="text-end">${formatCurrency(item.budgeted)}</td>
+                            <td class="text-end">${formatCurrency(item.actual)}</td>
+                            <td class="text-end ${statusClass}">${item.difference >= 0 ? '+' : ''}${formatCurrency(item.difference)}</td>
+                            <td><span class="badge ${statusBadge}">${statusText}</span></td>
+                        </tr>
+                    `;
+                });
+            }
+
+            // Fund section
+            if (fundItems.length > 0) {
+                comparisonHtml += '<tr><td colspan="5" class="fw-bold bg-light">Fund Contributions</td></tr>';
+                fundItems.forEach(item => {
+                    const statusClass = item.status === 'over' ? 'text-danger' : 'text-success';
+                    const statusBadge = item.status === 'over' ? 'badge-danger' : 'badge-success';
+                    const statusText = item.status === 'over' ? 'Over Budget' : 'Under Budget';
+
                     comparisonHtml += `
                         <tr>
                             <td>${item.category}</td>
