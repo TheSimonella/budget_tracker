@@ -1,0 +1,676 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Budget Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Dashboard Specific Styles */
+    .summary-item {
+        text-align: center;
+        border-right: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 0.5rem 0;
+    }
+    
+    .summary-item:last-child {
+        border-right: none;
+    }
+    
+    .summary-label {
+        font-size: 0.75rem;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .summary-value {
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin: 0.25rem 0;
+    }
+    
+    .summary-subtext {
+        font-size: 0.7rem;
+        opacity: 0.8;
+    }
+    
+    /* Gradient Summary Strip */
+    .summary-strip {
+        background: var(--primary-gradient);
+        color: white;
+        padding: 1.5rem 0;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Sankey Diagram */
+    #sankeyDiagram {
+        width: 100%;
+        height: 350px;
+    }
+    
+    /* Expandable Content */
+    .expandable-content {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    /* Transaction Items */
+    .transaction-item {
+        padding: 0.75rem 1rem;
+        font-size: 0.813rem;
+        border-bottom: 1px solid var(--gray-100);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background-color 0.2s;
+    }
+    
+    .transaction-item:hover {
+        background-color: var(--gray-50);
+    }
+    
+    .transaction-item:last-child {
+        border-bottom: none;
+    }
+    
+    .transaction-details {
+        flex: 1;
+    }
+    
+    .transaction-amount {
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    /* Fund Items */
+    .fund-item {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--gray-100);
+    }
+    
+    .fund-item:last-child {
+        border-bottom: none;
+    }
+    
+    .fund-name {
+        font-size: 0.813rem;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+    
+    .fund-amount {
+        font-size: 0.75rem;
+        color: var(--gray-600);
+    }
+    
+    /* Progress Colors - Positive Progression */
+    .progress-positive-0 {
+        background-color: #e0e7ff;
+        color: #3730a3;
+    }
+    
+    .progress-positive-25 {
+        background-color: #c7d2fe;
+        color: #4c1d95;
+    }
+    
+    .progress-positive-50 {
+        background-color: #a5b4fc;
+        color: #4c1d95;
+    }
+    
+    .progress-positive-75 {
+        background-color: #818cf8;
+        color: white;
+    }
+    
+    .progress-positive-100 {
+        background-color: #22c55e;
+        color: white;
+    }
+    
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .summary-item {
+            border-right: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .summary-value {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Month Selector and Quick Actions -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Dashboard</h4>
+    <div class="input-group" style="width: 200px;">
+        <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <input type="month" class="form-control form-control-sm text-center" id="monthSelector" onchange="loadDashboardForMonth()">
+        <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Quick Actions Bar -->
+<div class="quick-actions-bar">
+    <span class="text-muted me-2" style="font-size: 0.813rem;">Quick Actions:</span>
+    <button class="btn btn-primary btn-sm quick-action-btn" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+        <i class="fas fa-plus"></i> Transaction
+    </button>
+    <a href="/budget" class="btn btn-outline-primary btn-sm quick-action-btn">
+        <i class="fas fa-calculator"></i> Budget
+    </a>
+    <a href="/funds" class="btn btn-outline-primary btn-sm quick-action-btn">
+        <i class="fas fa-piggy-bank"></i> Funds
+    </a>
+    <a href="/transactions" class="btn btn-outline-primary btn-sm quick-action-btn">
+        <i class="fas fa-list"></i> All Transactions
+    </a>
+    <a href="/reports" class="btn btn-outline-primary btn-sm quick-action-btn">
+        <i class="fas fa-chart-bar"></i> Reports
+    </a>
+</div>
+
+<!-- Summary Strip -->
+<div class="card dashboard-card">
+    <div class="summary-strip">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-6 col-md-3 summary-item">
+                    <div class="summary-label">Net Income</div>
+                    <div class="summary-value" id="netIncome">$0</div>
+                    <div class="summary-subtext">after deductions</div>
+                </div>
+                <div class="col-6 col-md-3 summary-item">
+                    <div class="summary-label">Expenses</div>
+                    <div class="summary-value" id="totalExpenses">$0</div>
+                    <div class="summary-subtext">this month</div>
+                </div>
+                <div class="col-6 col-md-3 summary-item">
+                    <div class="summary-label">Left to Budget</div>
+                    <div class="summary-value" id="leftToBudget">$0</div>
+                    <div class="summary-subtext">remaining</div>
+                </div>
+                <div class="col-6 col-md-3 summary-item">
+                    <div class="summary-label">Savings Rate</div>
+                    <div class="summary-value" id="savingsRate">0%</div>
+                    <div class="summary-subtext">of net income</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Area -->
+<div class="row">
+    <!-- Cash Flow Chart -->
+    <div class="col-lg-8 mb-3">
+        <div class="modern-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Cash Flow
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary active" onclick="loadSankeyData('monthly')">Month</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadSankeyData('annual')">Year</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="sankeyDiagram"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Side Panel -->
+    <div class="col-lg-4">
+        <!-- Recent Transactions -->
+        <div class="modern-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Recent Activity
+                <a href="/transactions" class="text-decoration-none" style="font-size: 0.75rem;">View all →</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="expandable-content" id="recentTransactions">
+                    <!-- Transactions will be loaded here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Savings Goals -->
+        <div class="modern-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Savings Goals
+                <a href="/funds" class="text-decoration-none" style="font-size: 0.75rem;">Manage →</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="expandable-content" id="fundsProgress">
+                    <!-- Funds will be loaded here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Budget Status Mini -->
+        <div class="modern-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Budget Status
+                <a href="/budget" class="text-decoration-none" style="font-size: 0.75rem;">Details →</a>
+            </div>
+            <div class="card-body">
+                <div id="budgetStatus">
+                    <!-- Budget status will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal fade" id="addTransactionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Transaction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addTransactionForm">
+                    <div class="mb-3">
+                        <label class="form-label">Transaction Type</label>
+                        <select class="form-select" name="transaction_type" required>
+                            <option value="">Select Type</option>
+                            <option value="income">Income</option>
+                            <option value="expense">Expense</option>
+                            <option value="fund_withdrawal">Fund Withdrawal</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" name="category_id" required>
+                            <option value="">Select Category</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount</label>
+                        <input type="number" class="form-control" name="amount" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" name="description" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Merchant/Source</label>
+                        <input type="text" class="form-control" name="merchant">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" name="date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveTransaction()">Save Transaction</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentPeriod = 'monthly';
+    let categories = [];
+    let currentMonth = new Date().toISOString().slice(0, 7);
+    
+    // Load dashboard data on page load
+    $(document).ready(function() {
+        // Set current month in selector
+        $('#monthSelector').val(currentMonth);
+        
+        loadDashboardData();
+        loadCategories();
+        loadSankeyData('monthly');
+        
+        // Set today's date as default
+        $('input[name="date"]').val(new Date().toISOString().split('T')[0]);
+        
+        // Update categories when transaction type changes
+        $('select[name="transaction_type"]').change(function() {
+            updateCategoryDropdown($(this).val());
+        });
+    });
+    
+    function changeMonth(direction) {
+        const dateInput = document.getElementById('monthSelector');
+        const currentValue = dateInput.value;
+        const [year, month] = currentValue.split('-').map(Number);
+        
+        const newDate = new Date(year, month - 1 + direction, 1);
+        const newYear = newDate.getFullYear();
+        const newMonth = String(newDate.getMonth() + 1).padStart(2, '0');
+        
+        const newValue = `${newYear}-${newMonth}`;
+        dateInput.value = newValue;
+        currentMonth = newValue;
+        
+        loadDashboardForMonth();
+    }
+    
+    function loadDashboardForMonth() {
+        currentMonth = $('#monthSelector').val();
+        loadDashboardData();
+        loadSankeyData(currentPeriod);
+    }
+    
+    function loadDashboardData() {
+        $.get(`/api/dashboard-data/${currentMonth}`, function(data) {
+            // Update summary values
+            $('#netIncome').text(formatCurrency(data.net_income).replace('.00', ''));
+            $('#totalExpenses').text(formatCurrency(data.total_expenses).replace('.00', ''));
+            
+            const leftToBudget = data.net_income - data.total_expenses - data.total_savings;
+            $('#leftToBudget').text(formatCurrency(leftToBudget).replace('.00', ''));
+            
+            const savingsRate = data.net_income > 0 ? ((data.total_savings / data.net_income) * 100).toFixed(0) : 0;
+            $('#savingsRate').text(savingsRate + '%');
+            
+            // Load other components
+            loadFundsProgress(data.funds);
+            loadRecentTransactions(data.recent_transactions);
+            loadBudgetStatus();
+        });
+    }
+    
+    function loadCategories() {
+        $.get('/api/categories', function(data) {
+            categories = data;
+        });
+    }
+    
+    function updateCategoryDropdown(transactionType) {
+        const select = $('select[name="category_id"]');
+        select.empty().append('<option value="">Select Category</option>');
+        
+        if (transactionType === 'income') {
+            const incomeCategories = categories.filter(c => c.type === 'income' && !c.name.toLowerCase().includes('deduction'));
+            const deductionCategories = categories.filter(c => c.type === 'income' && c.name.toLowerCase().includes('deduction'));
+            
+            if (incomeCategories.length > 0) {
+                select.append('<optgroup label="Income Sources">');
+                incomeCategories.forEach(cat => {
+                    select.append(`<option value="${cat.id}">${cat.name}</option>`);
+                });
+                select.append('</optgroup>');
+            }
+            
+            if (deductionCategories.length > 0) {
+                select.append('<optgroup label="Deductions">');
+                deductionCategories.forEach(cat => {
+                    select.append(`<option value="${cat.id}">${cat.name}</option>`);
+                });
+                select.append('</optgroup>');
+            }
+        } else if (transactionType === 'expense') {
+            // Group expenses by parent category
+            const expensesByParent = {};
+            categories.filter(c => c.type === 'expense').forEach(cat => {
+                const parent = cat.parent_category || 'Other';
+                if (!expensesByParent[parent]) expensesByParent[parent] = [];
+                expensesByParent[parent].push(cat);
+            });
+            
+            Object.keys(expensesByParent).sort().forEach(parent => {
+                select.append(`<optgroup label="${parent}">`);
+                expensesByParent[parent].forEach(cat => {
+                    select.append(`<option value="${cat.id}">${cat.name}</option>`);
+                });
+                select.append('</optgroup>');
+            });
+        } else if (transactionType === 'fund_withdrawal') {
+            const fundCategories = categories.filter(c => c.parent_category === 'Savings');
+            fundCategories.forEach(cat => {
+                select.append(`<option value="${cat.id}">${cat.name}</option>`);
+            });
+        }
+    }
+    
+    function loadFundsProgress(funds) {
+        if (funds.length === 0) {
+            $('#fundsProgress').html('<div class="p-3 text-center text-muted">No savings goals yet</div>');
+            return;
+        }
+        
+        let html = '';
+        funds.forEach((fund, index) => {
+            if (index < 3) { // Show only first 3 funds
+                const progress = Math.min(fund.progress, 100);
+                let progressClass = 'progress-positive-0';
+                
+                if (progress >= 100) progressClass = 'progress-positive-100';
+                else if (progress >= 75) progressClass = 'progress-positive-75';
+                else if (progress >= 50) progressClass = 'progress-positive-50';
+                else if (progress >= 25) progressClass = 'progress-positive-25';
+                
+                html += `
+                    <div class="fund-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="fund-name">${fund.name}</div>
+                            <div class="fund-amount">${formatCurrency(fund.balance)}</div>
+                        </div>
+                        <div class="progress" style="height: 16px;">
+                            <div class="progress-bar ${progressClass}" style="width: ${progress}%">
+                                ${fund.progress.toFixed(0)}%
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        if (funds.length > 3) {
+            html += `<div class="text-center p-2"><small class="text-muted">+${funds.length - 3} more goals</small></div>`;
+        }
+        
+        $('#fundsProgress').html(html);
+    }
+    
+    function loadRecentTransactions(transactions) {
+        if (transactions.length === 0) {
+            $('#recentTransactions').html('<div class="p-3 text-center text-muted">No recent transactions</div>');
+            return;
+        }
+        
+        let html = '<div class="p-2">';
+        transactions.slice(0, 5).forEach(trans => {
+            const amountClass = trans.type === 'expense' || trans.type === 'fund_withdrawal' ? 'text-danger' : 'text-success';
+            const sign = trans.type === 'expense' || trans.type === 'fund_withdrawal' ? '-' : '+';
+            
+            html += `
+                <div class="transaction-item">
+                    <div class="transaction-details">
+                        <div style="font-weight: 500;">${trans.description}</div>
+                        <div style="font-size: 0.75rem; color: #6c757d;">
+                            ${trans.category} • ${new Date(trans.date).toLocaleDateString()}
+                        </div>
+                    </div>
+                    <div class="transaction-amount ${amountClass}">
+                        ${sign}${formatCurrency(trans.amount).replace('.00', '')}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        
+        $('#recentTransactions').html(html);
+    }
+    
+    function loadBudgetStatus() {
+        $.get(`/api/budget-comparison/${currentMonth}`, function(data) {
+            const overBudget = data.filter(item => item.type === 'expense' && item.status === 'over');
+            const underBudget = data.filter(item => item.type === 'expense' && item.status === 'under');
+            
+            let html = '<div style="font-size: 0.813rem;">';
+            
+            if (overBudget.length > 0) {
+                html += '<div class="mb-2"><strong class="text-danger">Over Budget:</strong></div>';
+                overBudget.slice(0, 3).forEach(item => {
+                    const overAmount = item.actual - item.budgeted;
+                    html += `<div class="ms-2 mb-1">${item.category}: <span class="text-danger">+${formatCurrency(overAmount).replace('.00', '')}</span></div>`;
+                });
+            }
+            
+            html += `<div class="mt-2 text-center"><strong>${underBudget.length}</strong> categories within budget</div>`;
+            html += '</div>';
+            
+            $('#budgetStatus').html(html);
+        });
+    }
+    
+    function saveTransaction() {
+        const formData = $('#addTransactionForm').serializeArray();
+        const data = {};
+        formData.forEach(field => {
+            data[field.name] = field.value;
+        });
+        
+        $.ajax({
+            url: '/api/transactions',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function() {
+                $('#addTransactionModal').modal('hide');
+                $('#addTransactionForm')[0].reset();
+                showToast('Transaction added successfully!');
+                loadDashboardData();
+                loadSankeyData(currentPeriod);
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error: ' + error, 'error');
+            }
+        });
+    }
+    
+    function loadSankeyData(period) {
+        currentPeriod = period;
+        
+        // Update button states
+        $('.btn-group button').removeClass('active');
+        if (period === 'monthly') {
+            $('.btn-group button:first').addClass('active');
+        } else {
+            $('.btn-group button:last').addClass('active');
+        }
+        
+        const url = period === 'monthly' 
+            ? `/api/sankey-data/${period}/${currentMonth}`
+            : `/api/sankey-data/${period}/${currentMonth.split('-')[0]}-01`;
+            
+        $.get(url, function(data) {
+            drawSankey(data);
+        });
+    }
+    
+    function drawSankey(data) {
+        // Clear previous diagram
+        d3.select("#sankeyDiagram").selectAll("*").remove();
+        
+        if (!data.nodes || data.nodes.length === 0 || !data.links || data.links.length === 0) {
+            d3.select("#sankeyDiagram")
+                .append("div")
+                .attr("class", "text-center text-muted")
+                .style("padding", "80px 20px")
+                .html('<i class="fas fa-chart-line fa-3x mb-3"></i><br>No transaction data available.<br>Add income and expense transactions to see your cash flow.');
+            return;
+        }
+        
+        const margin = {top: 10, right: 10, bottom: 10, left: 10};
+        const width = $("#sankeyDiagram").width() - margin.left - margin.right;
+        const height = 330 - margin.top - margin.bottom;
+        
+        const svg = d3.select("#sankeyDiagram")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+        
+        const sankey = d3.sankey()
+            .nodeWidth(15)
+            .nodePadding(10)
+            .extent([[0, 0], [width, height]]);
+        
+        const {nodes, links} = sankey(data);
+        
+        // Determine node type for coloring
+        function getNodeType(nodeName) {
+            if (nodeName === 'Income') return "income";
+            if (nodeName === 'Deductions') return "deduction";
+            if (nodeName === 'Expenses') return "expense";
+            if (nodeName === 'Savings') return "fund";
+            if (nodeName === 'Budget') return "budget";
+            return "other";
+        }
+        
+        // Add links
+        svg.append("g")
+            .selectAll("path")
+            .data(links)
+            .join("path")
+            .attr("d", d3.sankeyLinkHorizontal())
+            .attr("stroke", d => {
+                const targetType = getNodeType(d.target.name);
+                if (targetType === "deduction") return "#f77f00";
+                if (targetType === "expense") return "#dc3545";
+                if (targetType === "fund") return "#2a9d8f";
+                return "#4361ee";
+            })
+            .attr("stroke-width", d => Math.max(1, d.width))
+            .attr("fill", "none")
+            .attr("opacity", 0.5);
+        
+        // Add nodes
+        const node = svg.append("g")
+            .selectAll("g")
+            .data(nodes)
+            .join("g");
+        
+        node.append("rect")
+            .attr("x", d => d.x0)
+            .attr("y", d => d.y0)
+            .attr("height", d => d.y1 - d.y0)
+            .attr("width", d => d.x1 - d.x0)
+            .attr("fill", d => {
+                const type = getNodeType(d.name);
+                if (type === "income") return "#4361ee";
+                if (type === "deduction") return "#f77f00";
+                if (type === "expense") return "#dc3545";
+                if (type === "fund") return "#2a9d8f";
+                if (type === "budget") return "#6c757d";
+                return "#999";
+            });
+        
+        node.append("text")
+            .attr("x", d => d.x0 - 6)
+            .attr("y", d => (d.y1 + d.y0) / 2)
+            .attr("dy", "0.35em")
+            .attr("text-anchor", "end")
+            .text(d => d.name)
+            .style("font-size", "12px")
+            .filter(d => d.x0 < width / 2)
+            .attr("x", d => d.x1 + 6)
+            .attr("text-anchor", "start");
+    }
+</script>
+{% endblock %}

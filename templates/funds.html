@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}Funds Management - Budget Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .fund-card {
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .fund-stats {
+        display: flex;
+        justify-content: space-around;
+        margin: 20px 0;
+    }
+    
+    .fund-stat {
+        text-align: center;
+    }
+    
+    .fund-stat-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+    
+    .fund-stat-label {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .recommendation-box {
+        background-color: #e7f3ff;
+        border: 1px solid #b3d9ff;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-piggy-bank"></i> Savings Funds
+            <button class="btn btn-primary float-end" data-bs-toggle="modal" data-bs-target="#addFundModal">
+                <i class="fas fa-plus"></i> Create Fund
+            </button>
+        </h1>
+    </div>
+</div>
+
+<div class="row" id="fundsContainer">
+    <!-- Funds will be loaded here -->
+</div>
+
+<!-- Add Fund Modal -->
+<div class="modal fade" id="addFundModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create New Fund</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addFundForm">
+                    <div class="mb-3">
+                        <label class="form-label">Fund Name</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Current Balance</label>
+                        <input type="number" class="form-control" name="current_balance" step="0.01" value="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Goal Amount</label>
+                        <input type="number" class="form-control" name="goal_amount" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Target Date</label>
+                        <input type="date" class="form-control" name="goal_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Monthly Contribution</label>
+                        <input type="number" class="form-control" name="monthly_contribution" step="0.01" value="0">
+                        <small class="form-text text-muted">This will be added to your budget as a monthly expense</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveFund()">Create Fund</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Fund Modal -->
+<div class="modal fade" id="editFundModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Fund</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editFundForm">
+                    <input type="hidden" name="id">
+                    <div class="mb-3">
+                        <label class="form-label">Fund Name</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Goal Amount</label>
+                        <input type="number" class="form-control" name="goal_amount" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Target Date</label>
+                        <input type="date" class="form-control" name="goal_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Monthly Contribution</label>
+                        <input type="number" class="form-control" name="monthly_contribution" step="0.01" value="0">
+                        <small class="form-text text-muted">This will update your budget expense</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateFund()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let editingFundId = null;
+    
+    $(document).ready(function() {
+        loadFunds();
+    });
+    
+    function loadFunds() {
+        $.get('/api/funds', function(funds) {
+            const container = $('#fundsContainer');
+            
+            if (funds.length === 0) {
+                container.html(`
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> No funds created yet. Click "Create Fund" to start saving for your goals!
+                        </div>
+                    </div>
+                `);
+                return;
+            }
+            
+            let html = '';
+            funds.forEach(fund => {
+                const progress = (fund.balance / fund.goal * 100).toFixed(1);
+                const monthsRemaining = calculateMonthsRemaining(fund.goal_date);
+                
+                // Use positive color progression
+                let progressClass = '';
+                if (progress >= 100) progressClass = 'bg-success';
+                else if (progress >= 75) progressClass = 'bg-primary';
+                else if (progress >= 50) progressClass = 'bg-info';
+                else if (progress >= 25) progressClass = 'bg-secondary';
+                else progressClass = 'bg-light text-dark';
+                
+                // Create safe function parameters
+                const fundId = fund.id;
+                const fundNameEscaped = fund.name.replace(/'/g, "\\'");
+                
+                html += `
+                    <div class="col-lg-6 mb-4">
+                        <div class="card fund-card">
+                            <div class="card-header">
+                                <h5 class="mb-0">${fund.name}</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="progress mb-3" style="height: 30px;">
+                                    <div class="progress-bar ${progressClass}" style="width: ${Math.min(progress, 100)}%">
+                                        ${progress}%
+                                    </div>
+                                </div>
+                                
+                                <div class="fund-stats">
+                                    <div class="fund-stat">
+                                        <div class="fund-stat-value">${formatCurrency(fund.balance)}</div>
+                                        <div class="fund-stat-label">Current Balance</div>
+                                    </div>
+                                    <div class="fund-stat">
+                                        <div class="fund-stat-value">${formatCurrency(fund.goal)}</div>
+                                        <div class="fund-stat-label">Goal Amount</div>
+                                    </div>
+                                    <div class="fund-stat">
+                                        <div class="fund-stat-value">${monthsRemaining}</div>
+                                        <div class="fund-stat-label">Months Left</div>
+                                    </div>
+                                </div>
+                                
+                                ${fund.goal_date ? `
+                                    <div class="recommendation-box">
+                                        <h6><i class="fas fa-lightbulb"></i> Fund Details</h6>
+                                        <p class="mb-1">Target Date: ${new Date(fund.goal_date).toLocaleDateString()}</p>
+                                        <p class="mb-1">Recommended monthly: ${formatCurrency(fund.recommended_contribution)}</p>
+                                        ${fund.monthly_contribution > 0 ? 
+                                            `<p class="mb-0"><strong>Budget contribution: ${formatCurrency(fund.monthly_contribution)}/month</strong></p>` : 
+                                            '<p class="mb-0 text-muted">No monthly contribution set in budget</p>'
+                                        }
+                                    </div>
+                                ` : ''}
+                                
+                                <div class="mt-3">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editFund(${fundId})">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="withdrawFrom(${fundId}, '${fundNameEscaped}')">
+                                        <i class="fas fa-minus"></i> Withdraw
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFund(${fundId}, '${fundNameEscaped}')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.html(html);
+        });
+    }
+    
+    function calculateMonthsRemaining(goalDate) {
+        if (!goalDate) return 'N/A';
+        
+        const now = new Date();
+        const goal = new Date(goalDate);
+        const months = (goal.getFullYear() - now.getFullYear()) * 12 + (goal.getMonth() - now.getMonth());
+        
+        return months > 0 ? months : 0;
+    }
+    
+    function saveFund() {
+        const formData = $('#addFundForm').serializeArray();
+        const data = {};
+        formData.forEach(field => {
+            data[field.name] = field.value;
+        });
+        
+        $.ajax({
+            url: '/api/funds',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function() {
+                $('#addFundModal').modal('hide');
+                $('#addFundForm')[0].reset();
+                showToast('Fund created successfully! Check your budget to see the monthly contribution.', 'success');
+                loadFunds();
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error creating fund: ' + error, 'error');
+            }
+        });
+    }
+    
+    function editFund(fundId) {
+        editingFundId = fundId;
+        
+        // Load fund data
+        $.get(`/api/funds/${fundId}`, function(data) {
+            $('#editFundForm input[name="id"]').val(data.id);
+            $('#editFundForm input[name="name"]').val(data.name);
+            $('#editFundForm input[name="goal_amount"]').val(data.goal);
+            $('#editFundForm input[name="goal_date"]').val(data.goal_date);
+            $('#editFundForm input[name="monthly_contribution"]').val(data.monthly_contribution);
+            
+            $('#editFundModal').modal('show');
+        }).fail(function() {
+            showToast('Error loading fund data', 'error');
+        });
+    }
+    
+    function updateFund() {
+        const formData = $('#editFundForm').serializeArray();
+        const data = {};
+        formData.forEach(field => {
+            data[field.name] = field.value;
+        });
+        
+        $.ajax({
+            url: `/api/funds/${editingFundId}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function() {
+                $('#editFundModal').modal('hide');
+                showToast('Fund updated successfully!', 'success');
+                loadFunds();
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error updating fund: ' + error, 'error');
+            }
+        });
+    }
+    
+    function deleteFund(fundId, fundName) {
+        if (confirm(`Are you sure you want to delete "${fundName}"? This will also remove it from your budget and delete all related transactions.`)) {
+            $.ajax({
+                url: `/api/funds/${fundId}`,
+                method: 'DELETE',
+                success: function() {
+                    showToast('Fund deleted successfully!', 'success');
+                    loadFunds();
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON?.error || 'Unknown error';
+                    showToast('Error deleting fund: ' + error, 'error');
+                }
+            });
+        }
+    }
+    
+    function withdrawFrom(fundId, fundName) {
+        const amount = prompt(`How much would you like to withdraw from ${fundName}?`);
+        if (amount && !isNaN(amount) && parseFloat(amount) > 0) {
+            $.ajax({
+                url: `/api/funds/${fundId}/withdraw`,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ amount: parseFloat(amount) }),
+                success: function(response) {
+                    showToast(`Successfully withdrew ${formatCurrency(parseFloat(amount))} from ${fundName}!`, 'success');
+                    loadFunds();
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON?.error || 'Unknown error';
+                    showToast('Error making withdrawal: ' + error, 'error');
+                }
+            });
+        }
+    }
+</script>
+{% endblock %}

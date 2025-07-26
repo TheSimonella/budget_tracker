@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block title %}Budget Setup - Budget Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+    .category-item {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .category-info {
+        flex-grow: 1;
+    }
+    
+    .budget-progress {
+        width: 200px;
+        margin: 0 20px;
+    }
+    
+    .add-category-form {
+        background-color: #e9ecef;
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+        display: none;
+    }
+    
+    .custom-budget {
+        background-color: #e3f2fd;
+        border-left: 4px solid #2196f3;
+    }
+    
+    .default-badge {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background-color: #6c757d;
+        color: white;
+        margin-left: 10px;
+    }
+    
+    .custom-badge {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background-color: #2196f3;
+        color: white;
+        margin-left: 10px;
+    }
+    
+    .badge-success {
+        background-color: #28a745;
+    }
+    
+    .badge-danger {
+        background-color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-calculator"></i> Budget Setup</h1>
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn btn-success" onclick="updateAllDefaults()">
+                    <i class="fas fa-save"></i> Save as Default Budget
+                </button>
+                <div class="input-group" style="width: 250px;">
+                    <button class="btn btn-outline-secondary" onclick="changeMonth(-1)">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <input type="month" class="form-control text-center" id="monthSelector" onchange="loadBudgetForMonth()">
+                    <button class="btn btn-outline-secondary" onclick="changeMonth(1)">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Income Categories -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-arrow-up text-success"></i> Income Sources
+            <button class="btn btn-sm btn-light float-end" onclick="showAddCategoryForm('income')">
+                <i class="fas fa-plus"></i> Add Income
+            </button>
+        </h5>
+    </div>
+    <div class="card-body">
+        <div id="incomeCategories">
+            <!-- Income categories will be loaded here -->
+        </div>
+        <div class="add-category-form" id="addIncomeForm">
+            <h6>Add Income Category</h6>
+            <form onsubmit="addCategory(event, 'income')">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Category Name</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Default Monthly Amount</label>
+                        <input type="number" class="form-control" name="monthly_budget" step="0.01" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Category</button>
+                <button type="button" class="btn btn-secondary" onclick="hideAddCategoryForm('income')">Cancel</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Deduction Categories -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-minus-circle text-warning"></i> Deductions
+            <button class="btn btn-sm btn-light float-end" onclick="showAddCategoryForm('deduction')">
+                <i class="fas fa-plus"></i> Add Deduction
+            </button>
+        </h5>
+    </div>
+    <div class="card-body">
+        <div id="deductionCategories">
+            <!-- Deduction categories will be loaded here -->
+        </div>
+        <div class="add-category-form" id="addDeductionForm">
+            <h6>Add Deduction Category</h6>
+            <form onsubmit="addCategory(event, 'deduction')">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Deduction Name</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Default Monthly Amount</label>
+                        <input type="number" class="form-control" name="monthly_budget" step="0.01" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Deduction</button>
+                <button type="button" class="btn btn-secondary" onclick="hideAddCategoryForm('deduction')">Cancel</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Expense Categories -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-arrow-down text-danger"></i> Expense Categories
+            <button class="btn btn-sm btn-light float-end" onclick="showAddCategoryForm('expense')">
+                <i class="fas fa-plus"></i> Add Expense
+            </button>
+        </h5>
+    </div>
+    <div class="card-body">
+        <div id="expenseCategories">
+            <!-- Expense categories will be loaded here -->
+        </div>
+        <div class="add-category-form" id="addExpenseForm">
+            <h6>Add Expense Category</h6>
+            <form onsubmit="addCategory(event, 'expense')">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Category Name</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Default Monthly Budget</label>
+                        <input type="number" class="form-control" name="monthly_budget" step="0.01" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Category</button>
+                <button type="button" class="btn btn-secondary" onclick="hideAddCategoryForm('expense')">Cancel</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Budget Comparison -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-chart-bar"></i> Budget vs Actual - <span id="comparisonMonth"></span>
+        </h5>
+    </div>
+    <div class="card-body">
+        <div id="budgetComparison">
+            <!-- Budget comparison will be loaded here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentMonth = new Date().toISOString().slice(0, 7);
+    let allCategories = [];
+    
+    $(document).ready(function() {
+        $('#monthSelector').val(currentMonth);
+        loadBudgetForMonth();
+    });
+    
+    function changeMonth(direction) {
+        const dateInput = document.getElementById('monthSelector');
+        const currentValue = dateInput.value;
+        const [year, month] = currentValue.split('-').map(Number);
+        
+        const newDate = new Date(year, month - 1 + direction, 1);
+        const newYear = newDate.getFullYear();
+        const newMonth = String(newDate.getMonth() + 1).padStart(2, '0');
+        
+        const newValue = `${newYear}-${newMonth}`;
+        dateInput.value = newValue;
+        currentMonth = newValue;
+        
+        loadBudgetForMonth();
+    }
+    
+    function loadBudgetForMonth() {
+        currentMonth = $('#monthSelector').val();
+        const [year, month] = currentMonth.split('-');
+        $('#comparisonMonth').text(`${getMonthName(parseInt(month))} ${year}`);
+        
+        loadCategories();
+        loadBudgetComparison();
+    }
+    
+    function getMonthName(month) {
+        const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                       'July', 'August', 'September', 'October', 'November', 'December'];
+        return months[month - 1];
+    }
+    
+    function loadCategories() {
+        $.get(`/api/budget/${currentMonth}`, function(data) {
+            allCategories = data;
+            
+            const incomeCategories = data.filter(c => c.type === 'income' && !c.name.toLowerCase().includes('deduction'));
+            const deductionCategories = data.filter(c => c.type === 'income' && c.name.toLowerCase().includes('deduction'));
+            const expenseCategories = data.filter(c => c.type === 'expense');
+            
+            displayCategories(incomeCategories, 'incomeCategories');
+            displayCategories(deductionCategories, 'deductionCategories');
+            displayCategories(expenseCategories, 'expenseCategories');
+        });
+    }
+    
+    function loadBudgetComparison() {
+        $.get(`/api/budget-comparison/${currentMonth}`, function(data) {
+            if (data.length === 0) {
+                $('#budgetComparison').html('<p class="text-muted">No budget data available for comparison.</p>');
+                return;
+            }
+            
+            let comparisonHtml = `
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th class="text-end">Budgeted</th>
+                            <th class="text-end">Actual</th>
+                            <th class="text-end">Difference</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            // Separate by type
+            const incomeItems = data.filter(item => item.type === 'income');
+            const expenseItems = data.filter(item => item.type === 'expense');
+            
+            // Income section
+            if (incomeItems.length > 0) {
+                comparisonHtml += '<tr><td colspan="5" class="fw-bold bg-light">Income</td></tr>';
+                incomeItems.forEach(item => {
+                    const statusClass = item.status === 'under' ? 'text-danger' : 'text-success';
+                    const statusBadge = item.status === 'under' ? 'badge-danger' : 'badge-success';
+                    const statusText = item.status === 'under' ? 'Under Budget' : 'On Track';
+                    
+                    comparisonHtml += `
+                        <tr>
+                            <td>${item.category}</td>
+                            <td class="text-end">${formatCurrency(item.budgeted)}</td>
+                            <td class="text-end">${formatCurrency(item.actual)}</td>
+                            <td class="text-end ${statusClass}">${formatCurrency(Math.abs(item.difference))}</td>
+                            <td><span class="badge ${statusBadge}">${statusText}</span></td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            // Expense section
+            if (expenseItems.length > 0) {
+                comparisonHtml += '<tr><td colspan="5" class="fw-bold bg-light">Expenses</td></tr>';
+                expenseItems.forEach(item => {
+                    const statusClass = item.status === 'over' ? 'text-danger' : 'text-success';
+                    const statusBadge = item.status === 'over' ? 'badge-danger' : 'badge-success';
+                    const statusText = item.status === 'over' ? 'Over Budget' : 'Under Budget';
+                    
+                    comparisonHtml += `
+                        <tr>
+                            <td>${item.category}</td>
+                            <td class="text-end">${formatCurrency(item.budgeted)}</td>
+                            <td class="text-end">${formatCurrency(item.actual)}</td>
+                            <td class="text-end ${statusClass}">${item.difference >= 0 ? '+' : ''}${formatCurrency(item.difference)}</td>
+                            <td><span class="badge ${statusBadge}">${statusText}</span></td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            comparisonHtml += '</tbody></table>';
+            $('#budgetComparison').html(comparisonHtml);
+        });
+    }
+    
+    function displayCategories(categories, containerId) {
+        const container = $('#' + containerId);
+        
+        if (categories.length === 0) {
+            container.html('<p class="text-muted">No categories added yet. Click "Add" to create your first category.</p>');
+            return;
+        }
+        
+        let html = '';
+        categories.forEach(cat => {
+            const isCustom = cat.is_custom;
+            html += `
+                <div class="category-item ${isCustom ? 'custom-budget' : ''}">
+                    <div class="category-info">
+                        <h6 class="mb-1">
+                            ${cat.name}
+                            ${isCustom ? '<span class="custom-badge">Custom</span>' : '<span class="default-badge">Default</span>'}
+                        </h6>
+                        <small class="text-muted">Budget: ${formatCurrency(cat.monthly_budget)}/month</small>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-2" onclick="editBudgetForMonth(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', ${cat.monthly_budget})">
+                            <i class="fas fa-edit"></i> Edit This Month
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${cat.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.html(html);
+    }
+    
+    function updateAllDefaults() {
+        if (confirm('This will save all current month budgets as the default for future months. Past months will not be affected. Continue?')) {
+            // Gather all current month's budgets
+            const updates = allCategories.map(cat => ({
+                category_id: cat.id,
+                amount: cat.monthly_budget
+            }));
+            
+            // Send batch update
+            $.ajax({
+                url: '/api/categories/update-all-defaults',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ updates: updates }),
+                success: function() {
+                    showToast('Default budget saved successfully! This will apply to all future months.', 'success');
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON?.error || 'Unknown error';
+                    showToast('Error saving default budget: ' + error, 'error');
+                }
+            });
+        }
+    }
+    
+    function editBudgetForMonth(categoryId, categoryName, currentAmount) {
+        const newAmount = prompt(`Edit budget for ${categoryName} for ${currentMonth}:`, currentAmount);
+        if (newAmount === null || newAmount === '' || isNaN(newAmount)) return;
+        
+        $.ajax({
+            url: `/api/budget/${currentMonth}/update`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                category_id: categoryId,
+                amount: parseFloat(newAmount)
+            }),
+            success: function() {
+                showToast('Budget updated for this month!');
+                loadBudgetForMonth();
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error updating budget: ' + error, 'error');
+            }
+        });
+    }
+    
+    function deleteCategory(id) {
+        if (confirm('Are you sure you want to delete this category? This will delete the category and all associated transactions.')) {
+            $.ajax({
+                url: `/api/categories/${id}`,
+                method: 'DELETE',
+                success: function() {
+                    showToast('Category deleted successfully!');
+                    loadBudgetForMonth();
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON?.error || 'Unknown error';
+                    showToast('Error deleting category: ' + error, 'error');
+                }
+            });
+        }
+    }
+    
+    function showAddCategoryForm(type) {
+        const formType = type === 'deduction' ? 'Deduction' : type.charAt(0).toUpperCase() + type.slice(1);
+        $('#add' + formType + 'Form').slideDown();
+    }
+    
+    function hideAddCategoryForm(type) {
+        const formType = type === 'deduction' ? 'Deduction' : type.charAt(0).toUpperCase() + type.slice(1);
+        const form = $('#add' + formType + 'Form');
+        form.slideUp();
+        form.find('form')[0].reset();
+        // Ensure the form is hidden
+        setTimeout(() => {
+            form.hide();
+        }, 500);
+    }
+    
+    function addCategory(event, type) {
+        event.preventDefault();
+        
+        const form = event.target;
+        let categoryName = form.name.value;
+        let categoryType = type;
+        
+        // For deductions, we store them as income type but with "Deduction" in the name
+        if (type === 'deduction') {
+            categoryType = 'income';
+            if (!categoryName.toLowerCase().includes('deduction')) {
+                categoryName = categoryName + ' Deduction';
+            }
+        }
+        const monthlyBudget = parseFloat(form.monthly_budget.value);
+
+        $.ajax({
+            url: `/api/categories`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                name: categoryName,
+                type: categoryType,
+                monthly_budget: monthlyBudget,
+                is_custom: true
+            }),
+            success: function () {
+                showToast('Category added successfully!');
+                loadBudgetForMonth();
+                hideAddCategoryForm(type);
+            },
+            error: function (xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error adding category: ' + error, 'error');
+            }
+        });
+    }
+</script>
+{% endblock %}
