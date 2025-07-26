@@ -25,6 +25,7 @@ class Category(db.Model):
     default_budget = db.Column(db.Float, default=0.0)
     parent_category = db.Column(db.String(100), nullable=True)
     is_custom = db.Column(db.Boolean, default=True)
+    sort_order = db.Column(db.Integer, default=0)
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -189,15 +190,17 @@ def get_dashboard_data(year_month):
 @app.route('/api/categories')
 def get_categories():
     try:
-        cats = Category.query.order_by(Category.name).all()
-        return jsonify([{
-            'id': c.id,
-            'name': c.name,
-            'type': c.type,
-            'default_budget': c.default_budget,
-            'parent_category': c.parent_category,
-            'is_custom': c.is_custom
-        } for c in cats])
+        cats = Category.query.order_by(Category.sort_order, Category.name).all()
+        return jsonify([
+            {
+                'id': c.id,
+                'name': c.name,
+                'type': c.type,
+                'default_budget': c.default_budget,
+                'parent_category': c.parent_category,
+                'is_custom': c.is_custom,
+                'sort_order': c.sort_order
+            } for c in cats])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -232,12 +235,14 @@ def create_category():
         if existing:
             return jsonify({'error': 'Category with this name already exists'}), 400
 
+        max_order = db.session.query(func.max(Category.sort_order)).scalar() or 0
         cat = Category(
             name=data['name'],
             type=data['type'],
             default_budget=budget_amount,
             parent_category=parent_category,
-            is_custom=True
+            is_custom=True,
+            sort_order=max_order + 1
         )
         db.session.add(cat)
         db.session.commit()
@@ -259,6 +264,37 @@ def delete_category(id):
         db.session.delete(cat)
         db.session.commit()
         return jsonify({'message': 'Category and related records deleted'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/categories/<int:id>', methods=['PUT'])
+def update_category(id):
+    try:
+        data = request.json
+        cat = Category.query.get_or_404(id)
+
+        if 'name' in data:
+            cat.name = data['name']
+        if 'parent_category' in data:
+            cat.parent_category = data['parent_category'] or None
+
+        db.session.commit()
+        return jsonify({'message': 'Category updated'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/categories/reorder', methods=['POST'])
+def reorder_categories():
+    try:
+        order = request.json.get('order', [])
+        for idx, cat_id in enumerate(order):
+            cat = Category.query.get(cat_id)
+            if cat:
+                cat.sort_order = idx
+        db.session.commit()
+        return jsonify({'message': 'Order updated'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -830,75 +866,67 @@ def get_sankey_data(period, year_month=None):
             Transaction.date >= start_date,
             Transaction.date < end_date
         ).all()
-        
-        # Build Sankey diagram data
+
+        income_totals = {}
+        deduction_totals = {}
+        expense_totals = {}
+        fund_totals = {}
+
+        for t in transactions:
+            if t.transaction_type == 'income':
+                if 'deduction' in t.category.name.lower():
+                    deduction_totals[t.category.name] = deduction_totals.get(t.category.name, 0) + t.amount
+                else:
+                    income_totals[t.category.name] = income_totals.get(t.category.name, 0) + t.amount
+            elif t.transaction_type == 'expense':
+                parent = t.category.parent_category or t.category.name
+                expense_totals[parent] = expense_totals.get(parent, 0) + t.amount
+            elif t.transaction_type == 'fund_contribution':
+                fund_totals[t.category.name] = fund_totals.get(t.category.name, 0) + t.amount
+
         nodes = []
-        links = []
         node_map = {}
-        
-        # Calculate totals first
-        total_income = sum(t.amount for t in transactions if t.transaction_type == 'income' and 'deduction' not in t.category.name.lower())
-        total_deductions = sum(t.amount for t in transactions if t.transaction_type == 'income' and 'deduction' in t.category.name.lower())
-        total_expenses = sum(t.amount for t in transactions if t.transaction_type == 'expense')
-        total_fund_contributions = sum(t.amount for t in transactions if t.transaction_type == 'fund_contribution')
-        
-        # Add main nodes
-        if total_income > 0:
-            node_map['Income'] = len(nodes)
-            nodes.append('Income')
-        
-        if total_deductions > 0:
-            node_map['Deductions'] = len(nodes)
-            nodes.append('Deductions')
-            
-        if total_expenses > 0:
-            node_map['Expenses'] = len(nodes)
-            nodes.append('Expenses')
-            
-        if total_fund_contributions > 0:
-            node_map['Savings'] = len(nodes)
-            nodes.append('Savings')
-        
-        # Add "Budget" as central node if we have income
-        if total_income > 0:
+
+        for name in income_totals.keys():
+            node_map[name] = len(nodes)
+            nodes.append({'name': name, 'type': 'income'})
+
+        if income_totals:
             node_map['Budget'] = len(nodes)
-            nodes.append('Budget')
-        
-        # Create links
-        if total_income > 0:
-            # Income to Budget
-            links.append({
-                'source': node_map['Income'],
-                'target': node_map['Budget'],
-                'value': total_income
-            })
-            
-            # Budget to Deductions
-            if total_deductions > 0:
-                links.append({
-                    'source': node_map['Budget'],
-                    'target': node_map['Deductions'],
-                    'value': total_deductions
-                })
-            
-            # Budget to Expenses
-            if total_expenses > 0:
-                links.append({
-                    'source': node_map['Budget'],
-                    'target': node_map['Expenses'],
-                    'value': total_expenses
-                })
-            
-            # Budget to Savings
-            if total_fund_contributions > 0:
-                links.append({
-                    'source': node_map['Budget'],
-                    'target': node_map['Savings'],
-                    'value': total_fund_contributions
-                })
+            nodes.append({'name': 'Budget', 'type': 'budget'})
+        else:
+            # still include budget node if there are expenses or funds
+            if deduction_totals or expense_totals or fund_totals:
+                node_map['Budget'] = len(nodes)
+                nodes.append({'name': 'Budget', 'type': 'budget'})
+
+        for name in deduction_totals.keys():
+            node_map[name] = len(nodes)
+            nodes.append({'name': name, 'type': 'deduction'})
+
+        for name in expense_totals.keys():
+            node_map[name] = len(nodes)
+            nodes.append({'name': name, 'type': 'expense'})
+
+        for name in fund_totals.keys():
+            node_map[name] = len(nodes)
+            nodes.append({'name': name, 'type': 'fund'})
+
+        links = []
+        for name, val in income_totals.items():
+            links.append({'source': node_map[name], 'target': node_map['Budget'], 'value': val})
+
+        for name, val in deduction_totals.items():
+            links.append({'source': node_map['Budget'], 'target': node_map[name], 'value': val})
+
+        for name, val in expense_totals.items():
+            links.append({'source': node_map['Budget'], 'target': node_map[name], 'value': val})
+
+        for name, val in fund_totals.items():
+            links.append({'source': node_map['Budget'], 'target': node_map[name], 'value': val})
         
         return jsonify({
-            'nodes': [{'name': node} for node in nodes],
+            'nodes': nodes,
             'links': links
         })
     except Exception as e:
@@ -1265,26 +1293,33 @@ def init_database():
     if Category.query.first() is None:
         default_categories = [
             # Income categories
-            Category(name='Gross Salary', type='income', parent_category='Income', default_budget=0, is_custom=False),
-            Category(name='401k Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='Health Insurance Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='Federal Tax Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='State Tax Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='Social Security Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='Medicare Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            
+            ('Gross Salary', 'income', 'Income'),
+            ('401k Deduction', 'income', 'Deductions'),
+            ('Health Insurance Deduction', 'income', 'Deductions'),
+            ('Federal Tax Deduction', 'income', 'Deductions'),
+            ('State Tax Deduction', 'income', 'Deductions'),
+            ('Social Security Deduction', 'income', 'Deductions'),
+            ('Medicare Deduction', 'income', 'Deductions'),
+
             # Basic expense categories
-            Category(name='Rent/Mortgage', type='expense', parent_category='Housing', default_budget=0, is_custom=False),
-            Category(name='Groceries', type='expense', parent_category='Food', default_budget=0, is_custom=False),
-            Category(name='Gas', type='expense', parent_category='Transportation', default_budget=0, is_custom=False),
-            Category(name='Utilities', type='expense', parent_category='Housing', default_budget=0, is_custom=False),
-            Category(name='Internet', type='expense', parent_category='Housing', default_budget=0, is_custom=False),
-            Category(name='Phone', type='expense', parent_category='Personal', default_budget=0, is_custom=False),
+            ('Rent/Mortgage', 'expense', 'Housing'),
+            ('Groceries', 'expense', 'Food'),
+            ('Gas', 'expense', 'Transportation'),
+            ('Utilities', 'expense', 'Housing'),
+            ('Internet', 'expense', 'Housing'),
+            ('Phone', 'expense', 'Personal'),
         ]
-        
-        for category in default_categories:
-            db.session.add(category)
-        
+
+        for order, (name, ctype, parent) in enumerate(default_categories):
+            db.session.add(Category(
+                name=name,
+                type=ctype,
+                parent_category=parent,
+                default_budget=0,
+                is_custom=False,
+                sort_order=order
+            ))
+
         try:
             db.session.commit()
             print("Default categories created successfully!")
@@ -1327,6 +1362,12 @@ def migrate_database():
             
             conn.commit()
             print("✓ Database migration completed")
+
+        if 'sort_order' not in existing_columns:
+            print("Adding sort_order column to category table...")
+            cursor.execute("ALTER TABLE category ADD COLUMN sort_order INTEGER DEFAULT 0")
+            conn.commit()
+            print("✓ Added sort_order column to category table")
         
         # Check fund table
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fund'")

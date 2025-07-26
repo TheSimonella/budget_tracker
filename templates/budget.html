@@ -256,7 +256,22 @@
             displayCategories(incomeCategories, 'incomeCategories');
             displayCategories(deductionCategories, 'deductionCategories');
             displayCategories(expenseCategories, 'expenseCategories');
+            enableSortables();
         });
+    }
+
+    function enableSortables() {
+        $('#incomeCategories, #deductionCategories, #expenseCategories').sortable({
+            update: function() {
+                const order = $(this).children().map((i, el) => $(el).data('id')).get();
+                $.ajax({
+                    url: '/api/categories/reorder',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ order: order })
+                });
+            }
+        }).disableSelection();
     }
     
     function loadBudgetComparison() {
@@ -331,36 +346,53 @@
     
     function displayCategories(categories, containerId) {
         const container = $('#' + containerId);
-        
+
         if (categories.length === 0) {
             container.html('<p class="text-muted">No categories added yet. Click "Add" to create your first category.</p>');
             return;
         }
-        
-        let html = '';
+        const grouped = {};
         categories.forEach(cat => {
-            const isCustom = cat.is_custom;
-            html += `
-                <div class="category-item ${isCustom ? 'custom-budget' : ''}">
-                    <div class="category-info">
-                        <h6 class="mb-1">
-                            ${cat.name}
-                            ${isCustom ? '<span class="custom-badge">Custom</span>' : '<span class="default-badge">Default</span>'}
-                        </h6>
-                        <small class="text-muted">Budget: ${formatCurrency(cat.monthly_budget)}/month</small>
-                    </div>
-                    <div>
-                        <button class="btn btn-sm btn-outline-primary me-2" onclick="editBudgetForMonth(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', ${cat.monthly_budget})">
-                            <i class="fas fa-edit"></i> Edit This Month
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${cat.id})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
+            const group = cat.parent_category || 'Other';
+            if (!grouped[group]) grouped[group] = [];
+            grouped[group].push(cat);
         });
-        
+
+        let html = '';
+        Object.keys(grouped).forEach(group => {
+            const slug = group.replace(/\s+/g, '-');
+            html += `<div class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-1">${group}</h6>
+                            <button class="btn btn-sm btn-link" data-bs-toggle="collapse" data-bs-target="#${slug}-${containerId}"><i class="fas fa-chevron-down"></i></button>
+                        </div>
+                        <div class="collapse show" id="${slug}-${containerId}">`;
+            grouped[group].forEach(cat => {
+                const isCustom = cat.is_custom;
+                html += `
+                    <div class="category-item ${isCustom ? 'custom-budget' : ''}" data-id="${cat.id}">
+                        <div class="category-info">
+                            <h6 class="mb-1">
+                                ${cat.name}
+                                ${isCustom ? '<span class="custom-badge">Custom</span>' : '<span class="default-badge">Default</span>'}
+                            </h6>
+                            <small class="text-muted">Budget: ${formatCurrency(cat.monthly_budget)}/month</small>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="editBudgetForMonth(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', ${cat.monthly_budget})">Edit $ This Month</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="editCategory(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', '${cat.parent_category || ''}')">Edit Category</a></li>
+                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteCategory(${cat.id})">Delete</a></li>
+                            </ul>
+                        </div>
+                    </div>`;
+            });
+            html += `</div></div>`;
+        });
+
         container.html(html);
     }
     
@@ -427,6 +459,26 @@
                 }
             });
         }
+    }
+
+    function editCategory(id, currentName, currentGroup) {
+        const newName = prompt('Edit category name:', currentName);
+        if (newName === null || newName === '') return;
+        const newGroup = prompt('Edit category group:', currentGroup);
+        $.ajax({
+            url: `/api/categories/${id}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ name: newName, parent_category: newGroup }),
+            success: function() {
+                showToast('Category updated!');
+                loadBudgetForMonth();
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error updating category: ' + error, 'error');
+            }
+        });
     }
     
     function showAddCategoryForm(type) {

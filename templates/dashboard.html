@@ -612,15 +612,9 @@
             .extent([[0, 0], [width, height]]);
         
         const {nodes, links} = sankey(data);
-        
-        // Determine node type for coloring
-        function getNodeType(nodeName) {
-            if (nodeName === 'Income') return "income";
-            if (nodeName === 'Deductions') return "deduction";
-            if (nodeName === 'Expenses') return "expense";
-            if (nodeName === 'Savings') return "fund";
-            if (nodeName === 'Budget') return "budget";
-            return "other";
+
+        function getNodeType(node) {
+            return node.type || 'other';
         }
         
         // Add links
@@ -630,7 +624,7 @@
             .join("path")
             .attr("d", d3.sankeyLinkHorizontal())
             .attr("stroke", d => {
-                const targetType = getNodeType(d.target.name);
+                const targetType = getNodeType(d.target);
                 if (targetType === "deduction") return "#f77f00";
                 if (targetType === "expense") return "#dc3545";
                 if (targetType === "fund") return "#2a9d8f";
@@ -652,7 +646,7 @@
             .attr("height", d => d.y1 - d.y0)
             .attr("width", d => d.x1 - d.x0)
             .attr("fill", d => {
-                const type = getNodeType(d.name);
+                const type = getNodeType(d);
                 if (type === "income") return "#4361ee";
                 if (type === "deduction") return "#f77f00";
                 if (type === "expense") return "#dc3545";
