@@ -375,11 +375,11 @@
     function loadDashboardData() {
         $.get(`/api/dashboard-data/${currentMonth}`, function(data) {
             // Update summary values
-            $('#netIncome').text(formatCurrency(data.net_income).replace('.00', ''));
-            $('#totalExpenses').text(formatCurrency(data.total_expenses).replace('.00', ''));
+            $('#netIncome').text(formatCurrency(data.net_income));
+            $('#totalExpenses').text(formatCurrency(data.total_expenses));
             
             const leftToBudget = data.net_income - data.total_expenses - data.total_savings;
-            $('#leftToBudget').text(formatCurrency(leftToBudget).replace('.00', ''));
+            $('#leftToBudget').text(formatCurrency(leftToBudget));
             
             const savingsRate = data.net_income > 0 ? ((data.total_savings / data.net_income) * 100).toFixed(0) : 0;
             $('#savingsRate').text(savingsRate + '%');
@@ -504,7 +504,7 @@
                         </div>
                     </div>
                     <div class="transaction-amount ${amountClass}">
-                        ${sign}${formatCurrency(trans.amount).replace('.00', '')}
+                        ${sign}${formatCurrency(trans.amount)}
                     </div>
                 </div>
             `;
@@ -525,7 +525,7 @@
                 html += '<div class="mb-2"><strong class="text-danger">Over Budget:</strong></div>';
                 overBudget.slice(0, 3).forEach(item => {
                     const overAmount = item.actual - item.budgeted;
-                    html += `<div class="ms-2 mb-1">${item.category}: <span class="text-danger">+${formatCurrency(overAmount).replace('.00', '')}</span></div>`;
+                    html += `<div class="ms-2 mb-1">${item.category}: <span class="text-danger">+${formatCurrency(overAmount)}</span></div>`;
                 });
             }
             

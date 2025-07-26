@@ -364,13 +364,13 @@ def create_transaction():
         )
         
         # If it's an expense to a fund category, update the fund balance
-        if tx.transaction_type == 'expense' and category.parent_category == 'Savings':
+        if tx.transaction_type == 'expense' and category.type == 'fund':
             fund = Fund.query.filter_by(name=category.name).first()
             if fund:
                 fund.current_balance += tx.amount
-        
+
         # Handle fund withdrawals
-        elif tx.transaction_type == 'fund_withdrawal':
+        elif tx.transaction_type == 'fund_withdrawal' and category.type == 'fund':
             fund = Fund.query.filter_by(name=category.name).first()
             if fund:
                 if fund.current_balance < tx.amount:
@@ -537,8 +537,8 @@ def create_fund():
         # Create a fund category with the monthly contribution as default budget
         cat = Category(
             name=fund.name,
-            type='expense',  # Changed from 'fund' to 'expense' so it appears in budget
-            default_budget=monthly,  # Set the monthly contribution as default budget
+            type='fund',
+            default_budget=monthly,
             parent_category='Savings',
             is_custom=True
         )
@@ -703,7 +703,7 @@ def withdraw_from_fund(id):
 def get_budget_for_month(year_month):
     try:
         # Build a list of categories with their budgeted amounts
-        cats = Category.query.filter(Category.type.in_(['income','expense'])).all()
+        cats = Category.query.filter(Category.type.in_(['income','expense','fund'])).all()
         resp = []
         
         for c in cats:
@@ -762,7 +762,7 @@ def budget_comparison(year_month):
         else:
             end_date = datetime(year, month + 1, 1).date()
         
-        cats = Category.query.filter(Category.type.in_(['income','expense'])).all()
+        cats = Category.query.filter(Category.type.in_(['income','expense','fund'])).all()
         comparison_data = []
         
         for cat in cats:
@@ -771,7 +771,7 @@ def budget_comparison(year_month):
             budget_amount = budget.amount if budget else cat.default_budget
             
             # Get actual spending/income
-            if cat.type == 'expense':
+            if cat.type in ['expense', 'fund']:
                 actual = db.session.query(func.sum(Transaction.amount)).filter(
                     Transaction.category_id == cat.id,
                     Transaction.date >= start_date,
@@ -786,7 +786,7 @@ def budget_comparison(year_month):
                     Transaction.transaction_type == 'income'
                 ).scalar() or 0
             
-            difference = budget_amount - actual if cat.type == 'expense' else actual - budget_amount
+            difference = budget_amount - actual if cat.type in ['expense','fund'] else actual - budget_amount
             percentage = (actual / budget_amount * 100) if budget_amount > 0 else 0
             
             comparison_data.append({
@@ -796,7 +796,7 @@ def budget_comparison(year_month):
                 'actual': actual,
                 'difference': difference,
                 'percentage': percentage,
-                'status': 'under' if (cat.type == 'expense' and actual <= budget_amount) or 
+                'status': 'under' if (cat.type in ['expense','fund'] and actual <= budget_amount) or
                                     (cat.type == 'income' and actual >= budget_amount) else 'over'
             })
         
