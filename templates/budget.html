@@ -37,16 +37,7 @@
         border: 1px solid #ced4da;
         padding: 2px 6px;
         border-radius: 4px;
-        cursor: pointer;
-        display: inline-block;
         min-width: 80px;
-    }
-
-    .editable-budget input {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        padding: 0;
         width: 100%;
         text-align: right;
     }
@@ -361,7 +352,7 @@
                         <div class="category-info">
                             <h6 class="mb-1">${cat.name}</h6>
                         </div>
-                        <div class="category-budget"><span class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}">${formatCurrency(cat.monthly_budget)}</span></div>
+                        <div class="category-budget"><input type="number" step="0.01" class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
                         <div class="category-actual">${formatCurrency(comp.actual)}</div>
                         <div class="category-remaining">${formatCurrency(remaining)}</div>
                         <div class="dropdown ms-2">
@@ -595,26 +586,30 @@
         `);
     }
 
-    $(document).on('click', '.editable-budget', function(){
-        const span = $(this);
-        if(span.find('input').length) return;
-        const current = parseFloat(span.data('amount')) || 0;
-        const input = $('<input type="number" style="width:100%;">').val(current.toFixed(2));
-        span.empty().append(input);
-        input.focus();
-        input.on('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); this.blur(); }});
-        input.on('blur', function(){
-            const newVal = parseFloat(input.val());
-            if(isNaN(newVal)) { span.text(formatCurrency(current)); return; }
-            $.ajax({
-                url: `/api/budget/${currentMonth}/update`,
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({ category_id: span.data('id'), amount: newVal }),
-                success: function(){ showToast('Budget updated'); loadBudgetForMonth(); },
-                error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error updating budget: '+error,'error'); loadBudgetForMonth(); }
-            });
+    function saveBudget(input) {
+        const current = parseFloat(input.data('amount')) || 0;
+        const newVal = parseFloat(input.val());
+        if (isNaN(newVal)) {
+            input.val(current.toFixed(2));
+            return;
+        }
+        if (newVal === current) return;
+        $.ajax({
+            url: `/api/budget/${currentMonth}/update`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ category_id: input.data('id'), amount: newVal }),
+            success: function(){ showToast('Budget updated'); loadBudgetForMonth(); },
+            error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error updating budget: '+error,'error'); loadBudgetForMonth(); }
         });
+    }
+
+    $(document).on('keydown', '.editable-budget', function(e){
+        if(e.key === 'Enter') { e.preventDefault(); $(this).blur(); }
+    });
+
+    $(document).on('blur', '.editable-budget', function(){
+        saveBudget($(this));
     });
 </script>
 {% endblock %}
