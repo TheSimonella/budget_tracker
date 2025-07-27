@@ -145,38 +145,23 @@
 {% endblock %}
 
 {% block content %}
-<!-- Month Selector and Quick Actions -->
+<!-- Month Selector and Add Transaction -->
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Dashboard</h4>
-    <div class="input-group" style="width: 200px;">
-        <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)">
-            <i class="fas fa-chevron-left"></i>
+    <div class="d-flex align-items-center">
+        <button class="btn btn-modern-primary me-2" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+            <i class="fas fa-plus me-1"></i> Add Transaction
         </button>
-        <input type="month" class="form-control form-control-sm text-center" id="monthSelector" onchange="loadDashboardForMonth()">
-        <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)">
-            <i class="fas fa-chevron-right"></i>
-        </button>
+        <div class="input-group" style="width: 200px;">
+            <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <input type="month" class="form-control form-control-sm text-center" id="monthSelector" onchange="loadDashboardForMonth()">
+            <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
     </div>
-</div>
-
-<!-- Quick Actions Bar -->
-<div class="quick-actions-bar">
-    <span class="text-muted me-2" style="font-size: 0.813rem;">Quick Actions:</span>
-    <button class="btn btn-primary btn-sm quick-action-btn" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
-        <i class="fas fa-plus"></i> Transaction
-    </button>
-    <a href="/budget" class="btn btn-outline-primary btn-sm quick-action-btn">
-        <i class="fas fa-calculator"></i> Budget
-    </a>
-    <a href="/funds" class="btn btn-outline-primary btn-sm quick-action-btn">
-        <i class="fas fa-piggy-bank"></i> Funds
-    </a>
-    <a href="/transactions" class="btn btn-outline-primary btn-sm quick-action-btn">
-        <i class="fas fa-list"></i> All Transactions
-    </a>
-    <a href="/reports" class="btn btn-outline-primary btn-sm quick-action-btn">
-        <i class="fas fa-chart-bar"></i> Reports
-    </a>
 </div>
 
 <!-- Summary Strip -->
@@ -375,11 +360,11 @@
     function loadDashboardData() {
         $.get(`/api/dashboard-data/${currentMonth}`, function(data) {
             // Update summary values
-            $('#netIncome').text(formatCurrency(data.net_income).replace('.00', ''));
-            $('#totalExpenses').text(formatCurrency(data.total_expenses).replace('.00', ''));
+            $('#netIncome').text(formatCurrency(data.net_income));
+            $('#totalExpenses').text(formatCurrency(data.total_expenses));
             
             const leftToBudget = data.net_income - data.total_expenses - data.total_savings;
-            $('#leftToBudget').text(formatCurrency(leftToBudget).replace('.00', ''));
+            $('#leftToBudget').text(formatCurrency(leftToBudget));
             
             const savingsRate = data.net_income > 0 ? ((data.total_savings / data.net_income) * 100).toFixed(0) : 0;
             $('#savingsRate').text(savingsRate + '%');
@@ -504,7 +489,7 @@
                         </div>
                     </div>
                     <div class="transaction-amount ${amountClass}">
-                        ${sign}${formatCurrency(trans.amount).replace('.00', '')}
+                        ${sign}${formatCurrency(trans.amount)}
                     </div>
                 </div>
             `;
@@ -525,7 +510,7 @@
                 html += '<div class="mb-2"><strong class="text-danger">Over Budget:</strong></div>';
                 overBudget.slice(0, 3).forEach(item => {
                     const overAmount = item.actual - item.budgeted;
-                    html += `<div class="ms-2 mb-1">${item.category}: <span class="text-danger">+${formatCurrency(overAmount).replace('.00', '')}</span></div>`;
+                    html += `<div class="ms-2 mb-1">${item.category}: <span class="text-danger">+${formatCurrency(overAmount)}</span></div>`;
                 });
             }
             

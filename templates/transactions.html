@@ -39,9 +39,14 @@
         color: var(--success-color);
         font-weight: 600;
     }
-    
+
     .amount-negative {
         color: var(--danger-color);
+        font-weight: 600;
+    }
+
+    .amount-deduction {
+        color: var(--warning-color);
         font-weight: 600;
     }
     
@@ -62,6 +67,11 @@
     .category-expense {
         background-color: rgba(239, 68, 68, 0.1);
         color: #dc2626;
+    }
+
+    .category-deduction {
+        background-color: rgba(250, 204, 21, 0.1);
+        color: #eab308;
     }
     
     .category-fund {
@@ -382,7 +392,7 @@
             }
         } else if (transactionType === 'expense') {
             const grouped = {};
-            categories.filter(c => c.type === 'expense').forEach(cat => {
+            categories.filter(c => c.type === 'expense' || c.type === 'fund').forEach(cat => {
                 const parent = cat.parent_category || 'Other';
                 if (!grouped[parent]) grouped[parent] = [];
                 grouped[parent].push(cat);
@@ -433,10 +443,20 @@
             let html = '';
             
             transactions.forEach(trans => {
-                const typeClass = trans.type === 'income' ? 'category-income' : 
-                                trans.type === 'expense' ? 'category-expense' : 'category-fund';
-                const amountClass = trans.type === 'expense' || trans.type === 'fund_withdrawal' ? 'amount-negative' : 'amount-positive';
-                const amountSign = trans.type === 'expense' || trans.type === 'fund_withdrawal' ? '-' : '+';
+                const isDeduction = trans.type === 'income' && trans.category.toLowerCase().includes('deduction');
+                const typeClass = isDeduction ? 'category-deduction'
+                                   : trans.type === 'income' ? 'category-income'
+                                   : trans.type === 'expense' ? 'category-expense'
+                                   : 'category-fund';
+                let amountClass = 'amount-positive';
+                let amountSign = '+';
+                if (trans.type === 'expense' || trans.type === 'fund_withdrawal') {
+                    amountClass = 'amount-negative';
+                    amountSign = '-';
+                } else if (isDeduction) {
+                    amountClass = 'amount-deduction';
+                    amountSign = '-';
+                }
                 
                 html += `
                     <tr class="transaction-row">
