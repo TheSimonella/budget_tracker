@@ -5,10 +5,22 @@ echo.
 :: Change to the budget-tracker directory
 cd /d %~dp0
 
+:: --------------------------------------------------------------------
+:: Setup virtual environment if it does not already exist
+if not exist "venv\Scripts\activate.bat" (
+    echo Creating virtual environment...
+    python -m venv venv
+)
+
 :: Activate virtual environment
 echo Activating virtual environment...
 call venv\Scripts\activate
 
+:: Install required packages every run ensures dependencies are met
+echo Installing dependencies...
+pip install -r requirements.txt >nul
+
+:: --------------------------------------------------------------------
 :: Start the Flask application in the background
 echo Starting Flask application...
 echo.
