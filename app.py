@@ -25,6 +25,7 @@ class Category(db.Model):
     default_budget = db.Column(db.Float, default=0.0)
     parent_category = db.Column(db.String(100), nullable=True)
     is_custom = db.Column(db.Boolean, default=True)
+    sort_order = db.Column(db.Integer, default=0)
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -190,13 +191,14 @@ def get_dashboard_data(year_month):
 def get_categories():
     try:
         cats = Category.query.order_by(Category.name).all()
-        return jsonify([{
+        return jsonify([{ 
             'id': c.id,
             'name': c.name,
             'type': c.type,
             'default_budget': c.default_budget,
             'parent_category': c.parent_category,
-            'is_custom': c.is_custom
+            'is_custom': c.is_custom,
+            'sort_order': c.sort_order
         } for c in cats])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -259,6 +261,44 @@ def delete_category(id):
         db.session.delete(cat)
         db.session.commit()
         return jsonify({'message': 'Category and related records deleted'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/categories/<int:id>', methods=['PUT'])
+def update_category(id):
+    try:
+        data = request.json
+        cat = Category.query.get_or_404(id)
+
+        if 'name' in data:
+            cat.name = data['name']
+        if 'parent_category' in data:
+            cat.parent_category = data['parent_category']
+        if 'default_budget' in data:
+            amount, error = validate_amount(data['default_budget'])
+            if error:
+                return jsonify({'error': error}), 400
+            cat.default_budget = amount
+        if 'sort_order' in data:
+            cat.sort_order = int(data['sort_order'])
+
+        db.session.commit()
+        return jsonify({'message': 'Category updated'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/categories/reorder', methods=['POST'])
+def reorder_categories():
+    try:
+        order_data = request.json.get('order', [])
+        for item in order_data:
+            cat = Category.query.get(item['id'])
+            if cat:
+                cat.sort_order = int(item.get('sort_order', 0))
+        db.session.commit()
+        return jsonify({'message': 'Order updated'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -721,6 +761,8 @@ def get_budget_for_month(year_month):
                 'id': c.id,
                 'name': c.name,
                 'type': c.type,
+                'parent_category': c.parent_category,
+                'sort_order': c.sort_order,
                 'monthly_budget': monthly_budget,
                 'is_custom': is_custom
             })
@@ -830,75 +872,53 @@ def get_sankey_data(period, year_month=None):
             Transaction.date >= start_date,
             Transaction.date < end_date
         ).all()
-        
-        # Build Sankey diagram data
+
+        income = {}
+        deductions = {}
+        expenses = {}
+        savings = {}
+
+        for t in transactions:
+            if t.transaction_type == 'income':
+                if 'deduction' in t.category.name.lower():
+                    deductions[t.category.name] = deductions.get(t.category.name, 0) + t.amount
+                else:
+                    income[t.category.name] = income.get(t.category.name, 0) + t.amount
+            elif t.transaction_type == 'expense':
+                group = t.category.parent_category or t.category.name
+                expenses[group] = expenses.get(group, 0) + t.amount
+            elif t.transaction_type == 'fund_contribution':
+                savings[t.category.name] = savings.get(t.category.name, 0) + t.amount
+
         nodes = []
         links = []
         node_map = {}
-        
-        # Calculate totals first
-        total_income = sum(t.amount for t in transactions if t.transaction_type == 'income' and 'deduction' not in t.category.name.lower())
-        total_deductions = sum(t.amount for t in transactions if t.transaction_type == 'income' and 'deduction' in t.category.name.lower())
-        total_expenses = sum(t.amount for t in transactions if t.transaction_type == 'expense')
-        total_fund_contributions = sum(t.amount for t in transactions if t.transaction_type == 'fund_contribution')
-        
-        # Add main nodes
-        if total_income > 0:
-            node_map['Income'] = len(nodes)
-            nodes.append('Income')
-        
-        if total_deductions > 0:
-            node_map['Deductions'] = len(nodes)
-            nodes.append('Deductions')
-            
-        if total_expenses > 0:
-            node_map['Expenses'] = len(nodes)
-            nodes.append('Expenses')
-            
-        if total_fund_contributions > 0:
-            node_map['Savings'] = len(nodes)
-            nodes.append('Savings')
-        
-        # Add "Budget" as central node if we have income
-        if total_income > 0:
-            node_map['Budget'] = len(nodes)
-            nodes.append('Budget')
-        
-        # Create links
-        if total_income > 0:
-            # Income to Budget
-            links.append({
-                'source': node_map['Income'],
-                'target': node_map['Budget'],
-                'value': total_income
-            })
-            
-            # Budget to Deductions
-            if total_deductions > 0:
-                links.append({
-                    'source': node_map['Budget'],
-                    'target': node_map['Deductions'],
-                    'value': total_deductions
-                })
-            
-            # Budget to Expenses
-            if total_expenses > 0:
-                links.append({
-                    'source': node_map['Budget'],
-                    'target': node_map['Expenses'],
-                    'value': total_expenses
-                })
-            
-            # Budget to Savings
-            if total_fund_contributions > 0:
-                links.append({
-                    'source': node_map['Budget'],
-                    'target': node_map['Savings'],
-                    'value': total_fund_contributions
-                })
-        
+
+        node_map['Budget'] = len(nodes)
+        nodes.append({'name': 'Budget', 'type': 'budget'})
+
+        for cat, amt in income.items():
+            node_map[cat] = len(nodes)
+            nodes.append({'name': cat, 'type': 'income'})
+            links.append({'source': node_map[cat], 'target': node_map['Budget'], 'value': amt})
+
+        for cat, amt in deductions.items():
+            node_map[cat] = len(nodes)
+            nodes.append({'name': cat, 'type': 'deduction'})
+            links.append({'source': node_map['Budget'], 'target': node_map[cat], 'value': amt})
+
+        for grp, amt in expenses.items():
+            node_map[grp] = len(nodes)
+            nodes.append({'name': grp, 'type': 'expense'})
+            links.append({'source': node_map['Budget'], 'target': node_map[grp], 'value': amt})
+
+        for fund, amt in savings.items():
+            node_map[fund] = len(nodes)
+            nodes.append({'name': fund, 'type': 'fund'})
+            links.append({'source': node_map['Budget'], 'target': node_map[fund], 'value': amt})
+
         return jsonify({
-            'nodes': [{'name': node} for node in nodes],
+            'nodes': nodes,
             'links': links
         })
     except Exception as e:
