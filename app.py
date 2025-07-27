@@ -18,6 +18,13 @@ db = SQLAlchemy(app)
 ####
 # Models
 ####
+class CategoryGroup(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    type = db.Column(db.String(50), nullable=False)  # income, expense, fund
+    sort_order = db.Column(db.Integer, default=0)
+
+
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
@@ -187,6 +194,43 @@ def get_dashboard_data(year_month):
 ####
 # API: Categories
 ####
+@app.route('/api/category-groups')
+def list_category_groups():
+    try:
+        gtype = request.args.get('type')
+        q = CategoryGroup.query
+        if gtype:
+            q = q.filter_by(type=gtype)
+        groups = q.order_by(CategoryGroup.sort_order, CategoryGroup.name).all()
+        return jsonify([{
+            'id': g.id,
+            'name': g.name,
+            'type': g.type,
+            'sort_order': g.sort_order
+        } for g in groups])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/category-groups', methods=['POST'])
+def create_category_group():
+    try:
+        data = request.json
+        name = data.get('name', '').strip()
+        gtype = data.get('type')
+        if not name or not gtype:
+            return jsonify({'error': 'Name and type are required'}), 400
+        existing = CategoryGroup.query.filter_by(name=name, type=gtype).first()
+        if existing:
+            return jsonify({'error': 'Group already exists'}), 400
+        grp = CategoryGroup(name=name, type=gtype)
+        db.session.add(grp)
+        db.session.commit()
+        return jsonify({'id': grp.id, 'message': 'Group created'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/categories')
 def get_categories():
     try:
@@ -223,6 +267,12 @@ def create_category():
                 parent_category = 'Expenses'
             elif data['type'] == 'fund':
                 parent_category = 'Savings'
+
+        grp = CategoryGroup.query.filter_by(name=parent_category, type=data['type']).first()
+        if not grp:
+            grp = CategoryGroup(name=parent_category, type=data['type'])
+            db.session.add(grp)
+            db.session.flush()
         
         # Validate budget amount
         budget_amount, error = validate_amount(data.get('monthly_budget', 0))
@@ -275,6 +325,10 @@ def update_category(id):
             cat.name = data['name']
         if 'parent_category' in data:
             cat.parent_category = data['parent_category']
+            grp = CategoryGroup.query.filter_by(name=cat.parent_category, type=cat.type).first()
+            if not grp:
+                grp = CategoryGroup(name=cat.parent_category, type=cat.type)
+                db.session.add(grp)
         if 'default_budget' in data:
             amount, error = validate_amount(data['default_budget'])
             if error:
@@ -297,6 +351,12 @@ def reorder_categories():
             cat = Category.query.get(item['id'])
             if cat:
                 cat.sort_order = int(item.get('sort_order', 0))
+                if 'parent_category' in item:
+                    cat.parent_category = item['parent_category']
+                    grp = CategoryGroup.query.filter_by(name=cat.parent_category, type=cat.type).first()
+                    if not grp:
+                        grp = CategoryGroup(name=cat.parent_category, type=cat.type)
+                        db.session.add(grp)
         db.session.commit()
         return jsonify({'message': 'Order updated'})
     except Exception as e:
@@ -1301,7 +1361,21 @@ def init_database():
             Category(name='Internet', type='expense', parent_category='Housing', default_budget=0, is_custom=False),
             Category(name='Phone', type='expense', parent_category='Personal', default_budget=0, is_custom=False),
         ]
-        
+
+        default_groups = {
+            ('Income', 'income'),
+            ('Deductions', 'income'),
+            ('Housing', 'expense'),
+            ('Food', 'expense'),
+            ('Transportation', 'expense'),
+            ('Personal', 'expense'),
+            ('Savings', 'fund'),
+        }
+
+        for name, typ in default_groups:
+            if not CategoryGroup.query.filter_by(name=name, type=typ).first():
+                db.session.add(CategoryGroup(name=name, type=typ))
+
         for category in default_categories:
             db.session.add(category)
         

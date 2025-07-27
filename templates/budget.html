@@ -92,9 +92,14 @@
     <div class="card-header">
         <h5 class="mb-0">
             <i class="fas fa-arrow-up text-success"></i> Income Sources
-            <button class="btn btn-sm btn-light float-end" onclick="showAddCategoryForm('income')">
-                <i class="fas fa-plus"></i> Add Income
-            </button>
+            <div class="float-end d-flex gap-2">
+                <button class="btn btn-sm btn-light" onclick="addGroup('income')">
+                    <i class="fas fa-folder-plus"></i> Add Group
+                </button>
+                <button class="btn btn-sm btn-light" onclick="showAddCategoryForm('income')">
+                    <i class="fas fa-plus"></i> Add Income
+                </button>
+            </div>
         </h5>
     </div>
     <div class="card-body">
@@ -126,9 +131,14 @@
     <div class="card-header">
         <h5 class="mb-0">
             <i class="fas fa-minus-circle text-warning"></i> Deductions
-            <button class="btn btn-sm btn-light float-end" onclick="showAddCategoryForm('deduction')">
-                <i class="fas fa-plus"></i> Add Deduction
-            </button>
+            <div class="float-end d-flex gap-2">
+                <button class="btn btn-sm btn-light" onclick="addGroup('income')">
+                    <i class="fas fa-folder-plus"></i> Add Group
+                </button>
+                <button class="btn btn-sm btn-light" onclick="showAddCategoryForm('deduction')">
+                    <i class="fas fa-plus"></i> Add Deduction
+                </button>
+            </div>
         </h5>
     </div>
     <div class="card-body">
@@ -160,9 +170,14 @@
     <div class="card-header">
         <h5 class="mb-0">
             <i class="fas fa-arrow-down text-danger"></i> Expense Categories
-            <button class="btn btn-sm btn-light float-end" onclick="showAddCategoryForm('expense')">
-                <i class="fas fa-plus"></i> Add Expense
-            </button>
+            <div class="float-end d-flex gap-2">
+                <button class="btn btn-sm btn-light" onclick="addGroup('expense')">
+                    <i class="fas fa-folder-plus"></i> Add Group
+                </button>
+                <button class="btn btn-sm btn-light" onclick="showAddCategoryForm('expense')">
+                    <i class="fas fa-plus"></i> Add Expense
+                </button>
+            </div>
         </h5>
     </div>
     <div class="card-body">
@@ -222,6 +237,7 @@
 <script>
     let currentMonth = new Date().toISOString().slice(0, 7);
     let allCategories = [];
+    let allGroups = [];
     
     $(document).ready(function() {
         $('#monthSelector').val(currentMonth);
@@ -248,9 +264,11 @@
         currentMonth = $('#monthSelector').val();
         const [year, month] = currentMonth.split('-');
         $('#comparisonMonth').text(`${getMonthName(parseInt(month))} ${year}`);
-        
-        loadCategories();
-        loadBudgetComparison();
+        $.get('/api/category-groups', function(gdata){
+            allGroups = gdata;
+            loadCategories();
+            loadBudgetComparison();
+        });
     }
     
     function getMonthName(month) {
@@ -268,10 +286,10 @@
             const expenseCategories = data.filter(c => c.type === 'expense');
             const fundCategories = data.filter(c => c.type === 'fund');
 
-            displayCategories(incomeCategories, 'incomeCategories');
-            displayCategories(deductionCategories, 'deductionCategories');
-            displayCategories(expenseCategories, 'expenseCategories');
-            displayCategories(fundCategories, 'fundCategories');
+            displayCategories(incomeCategories, 'incomeCategories', 'income');
+            displayCategories(deductionCategories, 'deductionCategories', 'income');
+            displayCategories(expenseCategories, 'expenseCategories', 'expense');
+            displayCategories(fundCategories, 'fundCategories', 'fund');
         });
     }
     
@@ -366,7 +384,7 @@
         });
     }
     
-    function displayCategories(categories, containerId) {
+    function displayCategories(categories, containerId, type) {
         const container = $('#' + containerId);
 
         if (categories.length === 0) {
@@ -375,23 +393,31 @@
         }
 
         const groups = {};
+        const defined = allGroups.filter(g => g.type === type);
+        defined.forEach(g => { groups[g.name] = []; });
         categories.forEach(cat => {
             const group = cat.parent_category || 'Other';
             if (!groups[group]) groups[group] = [];
             groups[group].push(cat);
         });
 
+        const ordered = [...defined.map(g=>g.name), ...Object.keys(groups).filter(g=>!defined.some(d=>d.name===g)).sort()];
+
         let html = '';
-        Object.keys(groups).sort().forEach(g => {
+        ordered.forEach(g => {
             const safeId = g.replace(/\s+/g, '-');
+            const total = (groups[g] || []).reduce((s,c)=>s+parseFloat(c.monthly_budget),0);
             html += `<div class="mb-3 category-group">
                         <div class="d-flex justify-content-between align-items-center">
                             <h6 class="mb-0">${g}</h6>
-                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">Toggle</button>
+                            <div>
+                                <span class="badge bg-secondary me-2 group-total" id="tot-${containerId}-${safeId}" style="display:none">${formatCurrency(total)}</span>
+                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">Toggle</button>
+                            </div>
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
 
-            groups[g].sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
+            (groups[g]||[]).sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
                 const isCustom = cat.is_custom;
                 html += `
                     <div class="category-item ${isCustom ? 'custom-budget' : ''}" data-id="${cat.id}">
@@ -419,6 +445,14 @@
 
         container.html(html);
 
+        container.find('.collapse').on('hide.bs.collapse', function(){
+            const tid = $(this).attr('id').replace('grp','tot');
+            $('#' + tid).show();
+        }).on('show.bs.collapse', function(){
+            const tid = $(this).attr('id').replace('grp','tot');
+            $('#' + tid).hide();
+        });
+
         container.find('.group-categories').sortable({
             update: function(event, ui) {
                 saveOrder(containerId);
@@ -429,7 +463,8 @@
     function saveOrder(containerId) {
         const order = [];
         $('#' + containerId + ' .category-item').each(function(i, el) {
-            order.push({id: $(el).data('id'), sort_order: i});
+            const group = $(el).closest('.group-categories').data('group');
+            order.push({id: $(el).data('id'), sort_order: i, parent_category: group});
         });
         $.ajax({
             url: '/api/categories/reorder',
@@ -455,6 +490,19 @@
             contentType: 'application/json',
             data: JSON.stringify({name:newName, default_budget:parseFloat(newBudget), parent_category:newGroup}),
             success: function(){ showToast('Category updated'); loadBudgetForMonth(); },
+            error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error: '+error,'error'); }
+        });
+    }
+
+    function addGroup(type) {
+        const name = prompt('New Group Name');
+        if (!name) return;
+        $.ajax({
+            url: '/api/category-groups',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({name:name, type:type}),
+            success: function(){ showToast('Group added'); loadBudgetForMonth(); },
             error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error: '+error,'error'); }
         });
     }
