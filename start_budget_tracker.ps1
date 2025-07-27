@@ -7,9 +7,20 @@ Write-Host ""
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Set-Location $scriptPath
 
+# -----------------------------------------------------------------------
+# Setup virtual environment if needed
+if (!(Test-Path "venv\Scripts\Activate.ps1")) {
+    Write-Host "Creating virtual environment..." -ForegroundColor Yellow
+    python -m venv venv
+}
+
 # Activate virtual environment
 Write-Host "Activating virtual environment..." -ForegroundColor Yellow
 & ".\venv\Scripts\Activate.ps1"
+
+# Install required packages
+Write-Host "Installing dependencies..." -ForegroundColor Yellow
+pip install -r requirements.txt | Out-Null
 
 # Get computer's IP address for network access
 $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlias -notlike "*Loopback*" -and $_.IPAddress -notlike "169.254.*"}).IPAddress | Select-Object -First 1
