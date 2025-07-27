@@ -59,6 +59,17 @@ class Budget(db.Model):
     category = db.relationship('Category')
     amount = db.Column(db.Float, nullable=False)
 
+class Subscription(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    merchant = db.Column(db.String(100), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    frequency_days = db.Column(db.Integer, default=30)
+    last_date = db.Column(db.Date, nullable=False)
+    next_renewal = db.Column(db.Date, nullable=False)
+    notify_days_before = db.Column(db.Integer, default=3)
+    email = db.Column(db.String(120))
+    active = db.Column(db.Boolean, default=True)
+
 ####
 # Helper Functions
 ####
@@ -98,6 +109,51 @@ def calculate_recommended_contribution(fund):
     remaining_amount = fund.goal - fund.current_balance
     return max(0, remaining_amount / months_remaining)
 
+def detect_subscriptions():
+    """Simple heuristic to identify recurring transactions by merchant and amount."""
+    txs = Transaction.query.filter(Transaction.merchant != None).order_by(Transaction.merchant, Transaction.date).all()
+    groups = {}
+    for t in txs:
+        key = (t.merchant.strip().lower(), round(t.amount, 2))
+        groups.setdefault(key, []).append(t)
+
+    for (merchant, amount), items in groups.items():
+        if len(items) < 2:
+            continue
+        items.sort(key=lambda x: x.date)
+        intervals = [(items[i].date - items[i-1].date).days for i in range(1, len(items))]
+        avg = sum(intervals) / len(intervals)
+        if not intervals:
+            continue
+        if all(abs(iv - avg) <= 3 for iv in intervals) and 27 <= avg <= 31:
+            last_date = items[-1].date
+            next_date = last_date + timedelta(days=round(avg))
+            sub = Subscription.query.filter_by(merchant=merchant, amount=amount).first()
+            if not sub:
+                sub = Subscription(merchant=merchant, amount=amount,
+                                   frequency_days=round(avg), last_date=last_date,
+                                   next_renewal=next_date)
+                db.session.add(sub)
+            else:
+                sub.last_date = last_date
+                sub.frequency_days = round(avg)
+                sub.next_renewal = next_date
+                sub.active = True
+    db.session.commit()
+
+def send_subscription_notifications():
+    """Placeholder notification logic printing upcoming renewals."""
+    today = datetime.now().date()
+    subs = Subscription.query.filter_by(active=True).all()
+    count = 0
+    for sub in subs:
+        notify_date = sub.next_renewal - timedelta(days=sub.notify_days_before or 0)
+        if today >= notify_date:
+            count += 1
+            if sub.email:
+                print(f"Notify {sub.email}: {sub.merchant} renews on {sub.next_renewal}")
+    return count
+
 ####
 # Page routes
 ####
@@ -120,6 +176,10 @@ def funds_view():
 @app.route('/reports')
 def reports_view():
     return render_template('reports.html')
+
+@app.route('/subscriptions')
+def subscriptions_view():
+    return render_template('subscriptions.html')
 
 ####
 # API: Dashboard
@@ -1319,6 +1379,39 @@ def import_excel():
                 os.remove(filepath)
     
     return jsonify({'error': 'Invalid file format'}), 400
+
+####
+# API: Subscriptions
+####
+
+@app.route('/api/subscriptions')
+def list_subscriptions():
+    subs = Subscription.query.filter_by(active=True).order_by(Subscription.next_renewal).all()
+    return jsonify([{
+        'id': s.id,
+        'merchant': s.merchant,
+        'amount': s.amount,
+        'next_renewal': s.next_renewal.isoformat(),
+        'frequency_days': s.frequency_days,
+        'notify_days_before': s.notify_days_before,
+        'email': s.email
+    } for s in subs])
+
+
+@app.route('/api/subscriptions/detect', methods=['POST'])
+def detect_subscriptions_endpoint():
+    try:
+        detect_subscriptions()
+        return jsonify({'message': 'Subscription detection completed'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/subscriptions/notify', methods=['POST'])
+def notify_subscriptions():
+    count = send_subscription_notifications()
+    return jsonify({'notifications_sent': count})
 
 # Database initialization function
 def init_database():
