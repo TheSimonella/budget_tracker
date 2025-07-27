@@ -1,0 +1,13 @@
+:root {
+  --background-color: var(--gray-100);
+  --text-color: var(--dark-color);
+  --navbar-background-color: white;
+  --card-background-color: white;
+}
+
+[data-theme='dark'] {
+  --background-color: #121212;
+  --text-color: #f8f9fa;
+  --navbar-background-color: #212529;
+  --card-background-color: #343a40;
+}
