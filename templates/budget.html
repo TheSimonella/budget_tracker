@@ -43,7 +43,12 @@
     }
 
     .editable-budget input {
-        background-color: #ffffff;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        width: 100%;
+        text-align: right;
     }
 
     .badge-success {
@@ -594,7 +599,7 @@
         const span = $(this);
         if(span.find('input').length) return;
         const current = parseFloat(span.data('amount')) || 0;
-        const input = $('<input type="number" class="form-control form-control-sm" style="width:100px;">').val(current.toFixed(2));
+        const input = $('<input type="number" style="width:100%;">').val(current.toFixed(2));
         span.empty().append(input);
         input.focus();
         input.on('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); this.blur(); }});
