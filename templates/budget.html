@@ -10,19 +10,20 @@
         border-radius: 8px;
         margin-bottom: 10px;
         display: flex;
-        justify-content: space-between;
         align-items: center;
     }
-    
+
     .category-info {
         flex-grow: 1;
     }
-    
-    .budget-progress {
-        width: 200px;
-        margin: 0 20px;
+
+    .category-budget,
+    .category-actual,
+    .category-remaining {
+        width: 110px;
+        text-align: right;
     }
-    
+
     .add-category-form {
         background-color: #e9ecef;
         padding: 20px;
@@ -30,34 +31,25 @@
         margin-top: 20px;
         display: none;
     }
-    
-    .custom-budget {
-        background-color: #e3f2fd;
-        border-left: 4px solid #2196f3;
+
+    .editable-budget {
+        background-color: #ffffff;
+        border: 1px solid #ced4da;
+        padding: 2px 6px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: inline-block;
+        min-width: 80px;
     }
-    
-    .default-badge {
-        font-size: 0.75rem;
-        padding: 2px 8px;
-        border-radius: 12px;
-        background-color: #6c757d;
-        color: white;
-        margin-left: 10px;
+
+    .editable-budget input {
+        background-color: #ffffff;
     }
-    
-    .custom-badge {
-        font-size: 0.75rem;
-        padding: 2px 8px;
-        border-radius: 12px;
-        background-color: #2196f3;
-        color: white;
-        margin-left: 10px;
-    }
-    
+
     .badge-success {
         background-color: #28a745;
     }
-    
+
     .badge-danger {
         background-color: #dc3545;
     }
@@ -69,23 +61,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1><i class="fas fa-calculator"></i> Budget Setup</h1>
-            <div class="d-flex align-items-center gap-3">
-                <button class="btn btn-success" onclick="updateAllDefaults()">
-                    <i class="fas fa-save"></i> Save as Default Budget
-                </button>
-                <div class="input-group" style="width: 250px;">
-                    <button class="btn btn-outline-secondary" onclick="changeMonth(-1)">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <input type="month" class="form-control text-center" id="monthSelector" onchange="loadBudgetForMonth()">
-                    <button class="btn btn-outline-secondary" onclick="changeMonth(1)">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-</div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="fas fa-calculator"></i> Budget Setup</h1>
+    <div class="input-group" style="width: 250px;">
+        <button class="btn btn-outline-secondary" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+        <input type="month" class="form-control text-center" id="monthSelector" onchange="loadBudgetForMonth()">
+        <button class="btn btn-outline-secondary" onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+    </div>
 </div>
 
 <div class="row">
@@ -356,29 +338,27 @@
                                 <i class="fas fa-caret-down"></i>
                             </button>
                         </div>
+                        <div class="d-flex fw-bold text-end px-2 mt-2">
+                            <div class="flex-grow-1"></div>
+                            <div class="category-budget">Budget</div>
+                            <div class="category-actual">Actual</div>
+                            <div class="category-remaining">Remaining</div>
+                            <div style="width:24px"></div>
+                        </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
 
 
             groups[g].sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
-                const isCustom = cat.is_custom;
-                const comp = comparisonData[cat.name] || {actual:0, percentage:0};
-                const progressClass = comp.percentage <= 100 ? 'bg-success' : 'bg-danger';
+                const comp = comparisonData[cat.name] || {actual:0};
+                const remaining = cat.monthly_budget - comp.actual;
                 html += `
-                    <div class="category-item ${isCustom ? 'custom-budget' : ''}" data-id="${cat.id}">
+                    <div class="category-item" data-id="${cat.id}">
                         <div class="category-info">
-                            <h6 class="mb-1">
-                                ${cat.name}
-                                ${isCustom ? '<span class="custom-badge">Custom</span>' : '<span class="default-badge">Default</span>'}
-                            </h6>
+                            <h6 class="mb-1">${cat.name}</h6>
                         </div>
-                        <div class="text-end me-2">
-                            <span class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}">${formatCurrency(cat.monthly_budget)}</span>
-                        </div>
-                        <div class="budget-progress">
-                            <div class="progress">
-                                <div class="progress-bar ${progressClass}" style="width:${Math.min(comp.percentage,100)}%">${formatCurrency(comp.actual)}</div>
-                            </div>
-                        </div>
+                        <div class="category-budget"><span class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}">${formatCurrency(cat.monthly_budget)}</span></div>
+                        <div class="category-actual">${formatCurrency(comp.actual)}</div>
+                        <div class="category-remaining">${formatCurrency(remaining)}</div>
                         <div class="dropdown ms-2">
                             <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
                             <ul class="dropdown-menu">
