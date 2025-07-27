@@ -825,7 +825,11 @@ def update_budget_for_month(year_month):
             db.session.add(b)
         else:
             b.amount = amount
-        
+
+        cat = Category.query.get(cat_id)
+        if cat:
+            cat.default_budget = amount
+
         db.session.commit()
         return jsonify({'message': 'Budget updated for this month'})
     except Exception as e:
