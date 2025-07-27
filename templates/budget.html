@@ -92,8 +92,11 @@
     <div class="card-header">
         <h5 class="mb-0">
             <i class="fas fa-arrow-up text-success"></i> Income Sources
-            <button class="btn btn-sm btn-light float-end" onclick="showAddCategoryForm('income')">
+            <button class="btn btn-sm btn-light float-end ms-2" onclick="showAddCategoryForm('income')">
                 <i class="fas fa-plus"></i> Add Income
+            </button>
+            <button class="btn btn-sm btn-light float-end" onclick="addGroup('income')">
+                <i class="fas fa-folder-plus"></i> Add Group
             </button>
         </h5>
     </div>
@@ -160,8 +163,11 @@
     <div class="card-header">
         <h5 class="mb-0">
             <i class="fas fa-arrow-down text-danger"></i> Expense Categories
-            <button class="btn btn-sm btn-light float-end" onclick="showAddCategoryForm('expense')">
+            <button class="btn btn-sm btn-light float-end ms-2" onclick="showAddCategoryForm('expense')">
                 <i class="fas fa-plus"></i> Add Expense
+            </button>
+            <button class="btn btn-sm btn-light float-end" onclick="addGroup('expense')">
+                <i class="fas fa-folder-plus"></i> Add Group
             </button>
         </h5>
     </div>
@@ -223,6 +229,7 @@
     let currentMonth = new Date().toISOString().slice(0, 7);
     let allCategories = [];
     
+    let categoryGroups = [];
     $(document).ready(function() {
         $('#monthSelector').val(currentMonth);
         loadBudgetForMonth();
@@ -260,19 +267,26 @@
     }
     
     function loadCategories() {
-        $.get(`/api/budget/${currentMonth}`, function(data) {
-            allCategories = data;
+        $.get('/api/category-groups', function(groups) {
+            categoryGroups = groups;
+            $.get(`/api/budget/${currentMonth}`, function(data) {
+                allCategories = data;
 
-            const incomeCategories = data.filter(c => c.type === 'income' && !c.name.toLowerCase().includes('deduction'));
-            const deductionCategories = data.filter(c => c.type === 'income' && c.name.toLowerCase().includes('deduction'));
-            const expenseCategories = data.filter(c => c.type === 'expense');
-            const fundCategories = data.filter(c => c.type === 'fund');
+                const incomeCategories = data.filter(c => c.type === 'income' && !c.name.toLowerCase().includes('deduction'));
+                const deductionCategories = data.filter(c => c.type === 'income' && c.name.toLowerCase().includes('deduction'));
+                const expenseCategories = data.filter(c => c.type === 'expense');
+                const fundCategories = data.filter(c => c.type === 'fund');
 
-            displayCategories(incomeCategories, 'incomeCategories');
-            displayCategories(deductionCategories, 'deductionCategories');
-            displayCategories(expenseCategories, 'expenseCategories');
-            displayCategories(fundCategories, 'fundCategories');
+                displayCategories(incomeCategories, 'incomeCategories', getGroupNames('income'));
+                displayCategories(deductionCategories, 'deductionCategories', getGroupNames('income'));
+                displayCategories(expenseCategories, 'expenseCategories', getGroupNames('expense'));
+                displayCategories(fundCategories, 'fundCategories', getGroupNames('fund'));
+            });
         });
+    }
+
+    function getGroupNames(type) {
+        return categoryGroups.filter(g => g.type === type).map(g => g.name);
     }
     
     function loadBudgetComparison() {
@@ -366,30 +380,33 @@
         });
     }
     
-    function displayCategories(categories, containerId) {
+    function displayCategories(categories, containerId, groupNames = []) {
         const container = $('#' + containerId);
 
-        if (categories.length === 0) {
+        if (categories.length === 0 && groupNames.length === 0) {
             container.html('<p class="text-muted">No categories added yet. Click "Add" to create your first category.</p>');
             return;
         }
 
         const groups = {};
+        groupNames.forEach(g => groups[g] = []);
         categories.forEach(cat => {
             const group = cat.parent_category || 'Other';
             if (!groups[group]) groups[group] = [];
             groups[group].push(cat);
         });
 
-        let html = '';
+        let html = "";
         Object.keys(groups).sort().forEach(g => {
-            const safeId = g.replace(/\s+/g, '-');
+            const safeId = g.replace(/\s+/g, "-");
+            const total = groups[g].reduce((sum, c) => sum + (c.monthly_budget || 0), 0);
             html += `<div class="mb-3 category-group">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">${g}</h6>
+                            <h6 class="mb-0">${g} <span class="badge bg-secondary group-total d-none" id="total-${containerId}-${safeId}">${formatCurrency(total)}</span></h6>
                             <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">Toggle</button>
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
+
 
             groups[g].sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
                 const isCustom = cat.is_custom;
@@ -418,6 +435,17 @@
         });
 
         container.html(html);
+
+        Object.keys(groups).forEach(g => {
+            const safeId = g.replace(/\s+/g, '-');
+            const collapseId = `#grp-${containerId}-${safeId}`;
+            $(collapseId).on('hide.bs.collapse', function(){
+                $(`#total-${containerId}-${safeId}`).removeClass('d-none');
+            });
+            $(collapseId).on('show.bs.collapse', function(){
+                $(`#total-${containerId}-${safeId}`).addClass('d-none');
+            });
+        });
 
         container.find('.group-categories').sortable({
             update: function(event, ui) {
@@ -574,6 +602,25 @@
             error: function (xhr) {
                 const error = xhr.responseJSON?.error || 'Unknown error';
                 showToast('Error adding category: ' + error, 'error');
+            }
+        });
+    }
+
+    function addGroup(type) {
+        const name = prompt('Group Name');
+        if (!name) return;
+        $.ajax({
+            url: '/api/category-groups',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ name: name, type: type }),
+            success: function() {
+                showToast('Group added successfully!');
+                loadBudgetForMonth();
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error adding group: ' + error, 'error');
             }
         });
     }

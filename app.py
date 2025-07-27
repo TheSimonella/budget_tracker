@@ -18,6 +18,12 @@ db = SQLAlchemy(app)
 ####
 # Models
 ####
+class CategoryGroup(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    type = db.Column(db.String(50), nullable=False)
+    __table_args__ = (db.UniqueConstraint("name", "type"),)
+
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
@@ -319,6 +325,38 @@ def update_all_defaults():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+####
+# API: Category Groups
+####
+@app.route("/api/category-groups")
+def list_category_groups():
+    try:
+        gtype = request.args.get("type")
+        q = CategoryGroup.query
+        if gtype:
+            q = q.filter_by(type=gtype)
+        groups = q.order_by(CategoryGroup.name).all()
+        return jsonify([{"id": g.id, "name": g.name, "type": g.type} for g in groups])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/category-groups", methods=["POST"])
+def create_category_group():
+    try:
+        data = request.json
+        if not data.get("name") or not data.get("type"):
+            return jsonify({"error": "Name and type required"}), 400
+        existing = CategoryGroup.query.filter_by(name=data["name"], type=data["type"]).first()
+        if existing:
+            return jsonify({"error": "Group already exists"}), 400
+        g = CategoryGroup(name=data["name"], type=data["type"])
+        db.session.add(g)
+        db.session.commit()
+        return jsonify({"id": g.id, "message": "Group created"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 
 ####
 # API: Transactions
@@ -1312,6 +1350,15 @@ def init_database():
             db.session.rollback()
             print(f"Error creating default categories: {str(e)}")
 
+# Initialize groups based on existing categories
+def init_groups():
+    if CategoryGroup.query.first() is None:
+        groups = Category.query.with_entities(Category.parent_category, Category.type).distinct().all()
+        for name, typ in groups:
+            if name:
+                db.session.add(CategoryGroup(name=name, type=typ))
+        db.session.commit()
+
 # Database migration function
 def migrate_database():
     """Add missing columns to existing database"""
@@ -1376,6 +1423,7 @@ if __name__ == '__main__':
             
             # Initialize default categories
             init_database()
+            init_groups()
             
         except Exception as e:
             print(f"Error initializing database: {str(e)}")
