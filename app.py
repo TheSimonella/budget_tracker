@@ -1316,6 +1316,68 @@ def import_excel():
     
     return jsonify({'error': 'Invalid file format'}), 400
 
+
+#
+# API: Import transactions from Plaid
+#
+@app.route('/api/import-plaid', methods=['POST'])
+def import_plaid_transactions():
+    """Fetch transactions from Plaid and store them as Transaction records."""
+    data = request.json or {}
+    access_token = data.get('access_token')
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+
+    if not access_token or not start_date or not end_date:
+        return jsonify({'error': 'access_token, start_date and end_date are required'}), 400
+
+    try:
+        from plaid import Client
+    except Exception:
+        return jsonify({'error': 'plaid-python package is not installed'}), 500
+
+    try:
+        client = Client(client_id=os.getenv('PLAID_CLIENT_ID'),
+                        secret=os.getenv('PLAID_SECRET'),
+                        environment=os.getenv('PLAID_ENV', 'sandbox'))
+        response = client.Transactions.get(access_token,
+                                           start_date=start_date,
+                                           end_date=end_date)
+        transactions = response.get('transactions', [])
+    except Exception as e:
+        return jsonify({'error': f'Plaid error: {str(e)}'}), 500
+
+    imported = 0
+    for t in transactions:
+        # Determine category name
+        cat_name = (t.get('category', [])[-1]
+                    if t.get('category') else 'Uncategorized')
+        tx_type = 'income' if 'income' in cat_name.lower() else 'expense'
+
+        # Match or create category
+        category = Category.query.filter_by(name=cat_name).first()
+        if not category:
+            category = Category(name=cat_name, type=tx_type, parent_category=None, default_budget=0)
+            db.session.add(category)
+            db.session.commit()
+
+        date_obj = datetime.strptime(t.get('date'), '%Y-%m-%d').date()
+
+        tx = Transaction(
+            amount=float(t.get('amount', 0)),
+            transaction_type=tx_type,
+            category_id=category.id,
+            description=t.get('name', ''),
+            merchant=t.get('merchant_name', ''),
+            date=date_obj,
+            notes='Imported from Plaid'
+        )
+        db.session.add(tx)
+        imported += 1
+
+    db.session.commit()
+    return jsonify({'message': f'Imported {imported} transactions'})
+
 # Database initialization function
 def init_database():
     """Initialize the database with default categories"""
