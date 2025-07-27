@@ -61,6 +61,10 @@
     .badge-danger {
         background-color: #dc3545;
     }
+
+    .group-toggle.collapsed i {
+        transform: rotate(-90deg);
+    }
 </style>
 {% endblock %}
 
@@ -81,11 +85,11 @@
                     <button class="btn btn-outline-secondary" onclick="changeMonth(1)">
                         <i class="fas fa-chevron-right"></i>
                     </button>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8" id="budgetSections">
 
 <!-- Income Categories -->
 <div class="card mb-4">
@@ -129,8 +133,11 @@
     <div class="card-header">
         <h5 class="mb-0">
             <i class="fas fa-minus-circle text-warning"></i> Deductions
-            <button class="btn btn-sm btn-light float-end" onclick="showAddCategoryForm('deduction')">
+            <button class="btn btn-sm btn-light float-end ms-2" onclick="showAddCategoryForm('deduction')">
                 <i class="fas fa-plus"></i> Add Deduction
+            </button>
+            <button class="btn btn-sm btn-light float-end" onclick="addGroup('income')">
+                <i class="fas fa-folder-plus"></i> Add Group
             </button>
         </h5>
     </div>
@@ -206,29 +213,50 @@
         <div id="fundCategories">
             <!-- Fund categories will be loaded here -->
         </div>
-    </div>
 </div>
-
-<!-- Budget Comparison -->
-<div class="card">
-    <div class="card-header">
-        <h5 class="mb-0">
-            <i class="fas fa-chart-bar"></i> Budget vs Actual - <span id="comparisonMonth"></span>
-        </h5>
-    </div>
-    <div class="card-body">
-        <div id="budgetComparison">
-            <!-- Budget comparison will be loaded here -->
+</div>
+    </div> <!-- end col-lg-8 -->
+    <div class="col-lg-4" id="summaryColumn">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Money To Budget</h5>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="summaryTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="sum-tab" data-bs-toggle="tab" data-bs-target="#sum" type="button" role="tab">Summary</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="inc-tab" data-bs-toggle="tab" data-bs-target="#income-summary" type="button" role="tab">Income</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="exp-tab" data-bs-toggle="tab" data-bs-target="#expense-summary" type="button" role="tab">Expenses</button>
+                    </li>
+                </ul>
+                <div class="tab-content border border-top-0 p-3" id="summaryTabContent">
+                    <div class="tab-pane fade show active" id="sum" role="tabpanel">
+                        <div id="summaryContent"></div>
+                    </div>
+                    <div class="tab-pane fade" id="income-summary" role="tabpanel">
+                        <div id="incomeSummaryContent"></div>
+                    </div>
+                    <div class="tab-pane fade" id="expense-summary" role="tabpanel">
+                        <div id="expenseSummaryContent"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
+    </div> <!-- end col-lg-4 -->
+</div> <!-- end row -->
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
     let currentMonth = new Date().toISOString().slice(0, 7);
     let allCategories = [];
-    
+    let comparisonData = {};
+
     let categoryGroups = [];
     $(document).ready(function() {
         $('#monthSelector').val(currentMonth);
@@ -256,8 +284,9 @@
         const [year, month] = currentMonth.split('-');
         $('#comparisonMonth').text(`${getMonthName(parseInt(month))} ${year}`);
         
-        loadCategories();
-        loadBudgetComparison();
+        loadBudgetComparison(function(){
+            loadCategories();
+        });
     }
     
     function getMonthName(month) {
@@ -277,8 +306,10 @@
                 const expenseCategories = data.filter(c => c.type === 'expense');
                 const fundCategories = data.filter(c => c.type === 'fund');
 
-                displayCategories(incomeCategories, 'incomeCategories', getGroupNames('income'));
-                displayCategories(deductionCategories, 'deductionCategories', getGroupNames('income'));
+                const incomeGroups = getGroupNames('income').filter(n => !n.toLowerCase().includes('deduct'));
+                const deductGroups = getGroupNames('income').filter(n => n.toLowerCase().includes('deduct'));
+                displayCategories(incomeCategories, 'incomeCategories', incomeGroups);
+                displayCategories(deductionCategories, 'deductionCategories', deductGroups);
                 displayCategories(expenseCategories, 'expenseCategories', getGroupNames('expense'));
                 displayCategories(fundCategories, 'fundCategories', getGroupNames('fund'));
             });
@@ -289,94 +320,12 @@
         return categoryGroups.filter(g => g.type === type).map(g => g.name);
     }
     
-    function loadBudgetComparison() {
+    function loadBudgetComparison(callback) {
         $.get(`/api/budget-comparison/${currentMonth}`, function(data) {
-            if (data.length === 0) {
-                $('#budgetComparison').html('<p class="text-muted">No budget data available for comparison.</p>');
-                return;
-            }
-            
-            let comparisonHtml = `
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Category</th>
-                            <th class="text-end">Budgeted</th>
-                            <th class="text-end">Actual</th>
-                            <th class="text-end">Difference</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            // Separate by type
-            const incomeItems = data.filter(item => item.type === 'income');
-            const expenseItems = data.filter(item => item.type === 'expense');
-            const fundItems = data.filter(item => item.type === 'fund');
-            
-            // Income section
-            if (incomeItems.length > 0) {
-                comparisonHtml += '<tr><td colspan="5" class="fw-bold bg-light">Income</td></tr>';
-                incomeItems.forEach(item => {
-                    const statusClass = item.status === 'under' ? 'text-danger' : 'text-success';
-                    const statusBadge = item.status === 'under' ? 'badge-danger' : 'badge-success';
-                    const statusText = item.status === 'under' ? 'Under Budget' : 'On Track';
-                    
-                    comparisonHtml += `
-                        <tr>
-                            <td>${item.category}</td>
-                            <td class="text-end">${formatCurrency(item.budgeted)}</td>
-                            <td class="text-end">${formatCurrency(item.actual)}</td>
-                            <td class="text-end ${statusClass}">${formatCurrency(Math.abs(item.difference))}</td>
-                            <td><span class="badge ${statusBadge}">${statusText}</span></td>
-                        </tr>
-                    `;
-                });
-            }
-            
-            // Expense section
-            if (expenseItems.length > 0) {
-                comparisonHtml += '<tr><td colspan="5" class="fw-bold bg-light">Expenses</td></tr>';
-                expenseItems.forEach(item => {
-                    const statusClass = item.status === 'over' ? 'text-danger' : 'text-success';
-                    const statusBadge = item.status === 'over' ? 'badge-danger' : 'badge-success';
-                    const statusText = item.status === 'over' ? 'Over Budget' : 'Under Budget';
-                    
-                    comparisonHtml += `
-                        <tr>
-                            <td>${item.category}</td>
-                            <td class="text-end">${formatCurrency(item.budgeted)}</td>
-                            <td class="text-end">${formatCurrency(item.actual)}</td>
-                            <td class="text-end ${statusClass}">${item.difference >= 0 ? '+' : ''}${formatCurrency(item.difference)}</td>
-                            <td><span class="badge ${statusBadge}">${statusText}</span></td>
-                        </tr>
-                    `;
-                });
-            }
-
-            // Fund section
-            if (fundItems.length > 0) {
-                comparisonHtml += '<tr><td colspan="5" class="fw-bold bg-light">Fund Contributions</td></tr>';
-                fundItems.forEach(item => {
-                    const statusClass = item.status === 'over' ? 'text-danger' : 'text-success';
-                    const statusBadge = item.status === 'over' ? 'badge-danger' : 'badge-success';
-                    const statusText = item.status === 'over' ? 'Over Budget' : 'Under Budget';
-
-                    comparisonHtml += `
-                        <tr>
-                            <td>${item.category}</td>
-                            <td class="text-end">${formatCurrency(item.budgeted)}</td>
-                            <td class="text-end">${formatCurrency(item.actual)}</td>
-                            <td class="text-end ${statusClass}">${item.difference >= 0 ? '+' : ''}${formatCurrency(item.difference)}</td>
-                            <td><span class="badge ${statusBadge}">${statusText}</span></td>
-                        </tr>
-                    `;
-                });
-            }
-            
-            comparisonHtml += '</tbody></table>';
-            $('#budgetComparison').html(comparisonHtml);
+            comparisonData = {};
+            data.forEach(item => comparisonData[item.category] = item);
+            if (callback) callback();
+            updateSummary();
         });
     }
     
@@ -403,13 +352,17 @@
             html += `<div class="mb-3 category-group">
                         <div class="d-flex justify-content-between align-items-center">
                             <h6 class="mb-0">${g} <span class="badge bg-secondary group-total d-none" id="total-${containerId}-${safeId}">${formatCurrency(total)}</span></h6>
-                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">Toggle</button>
+                            <button class="btn btn-sm btn-outline-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">
+                                <i class="fas fa-caret-down"></i>
+                            </button>
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
 
 
             groups[g].sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
                 const isCustom = cat.is_custom;
+                const comp = comparisonData[cat.name] || {actual:0, percentage:0};
+                const progressClass = comp.percentage <= 100 ? 'bg-success' : 'bg-danger';
                 html += `
                     <div class="category-item ${isCustom ? 'custom-budget' : ''}" data-id="${cat.id}">
                         <div class="category-info">
@@ -417,12 +370,18 @@
                                 ${cat.name}
                                 ${isCustom ? '<span class="custom-badge">Custom</span>' : '<span class="default-badge">Default</span>'}
                             </h6>
-                            <small class="text-muted">Budget: ${formatCurrency(cat.monthly_budget)}/month</small>
                         </div>
-                        <div class="dropdown">
+                        <div class="text-end me-2">
+                            <span class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}">${formatCurrency(cat.monthly_budget)}</span>
+                        </div>
+                        <div class="budget-progress">
+                            <div class="progress">
+                                <div class="progress-bar ${progressClass}" style="width:${Math.min(comp.percentage,100)}%">${formatCurrency(comp.actual)}</div>
+                            </div>
+                        </div>
+                        <div class="dropdown ms-2">
                             <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#" onclick="editBudgetForMonth(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', ${cat.monthly_budget})">Edit $ This Month</a></li>
                                 <li><a class="dropdown-item" href="#" onclick='editCategory(${JSON.stringify(cat)})'>Edit Category</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="#" onclick="deleteCategory(${cat.id})">Delete</a></li>
@@ -624,5 +583,53 @@
             }
         });
     }
+    function updateSummary() {
+        let incB=0, incA=0, dedB=0, dedA=0, expB=0, expA=0, fundB=0, fundA=0;
+        Object.values(comparisonData).forEach(item => {
+            if(item.type==='income') {
+                if(item.category.toLowerCase().includes("deduction")) { dedB+=item.budgeted; dedA+=item.actual; }
+                else { incB+=item.budgeted; incA+=item.actual; }
+            } else if(item.type==='expense') { expB+=item.budgeted; expA+=item.actual; }
+            else if(item.type==='fund') { fundB+=item.budgeted; fundA+=item.actual; }
+        });
+        const totalBudgetExp = expB + fundB + dedB;
+        const totalActualExp = expA + fundA + dedA;
+        const moneyToBudget = incA - totalActualExp;
+        $('#summaryContent').html(`<p class="fs-4 text-center">${formatCurrency(moneyToBudget)}</p>`);
+        const incPercent = incB ? incA / incB * 100 : 0;
+        const expPercent = totalBudgetExp ? totalActualExp / totalBudgetExp * 100 : 0;
+        const expClass = expPercent <= 100 ? "bg-success" : "bg-danger";
+        $('#incomeSummaryContent').html(`
+            <p>Earned ${formatCurrency(incA)} of ${formatCurrency(incB)}</p>
+            <div class="progress"><div class="progress-bar bg-success" style="width:${Math.min(incPercent,100)}%">${incPercent.toFixed(0)}%</div></div>
+            ${incPercent>100?'<div class="mt-2 text-success">Great job exceeding your goal!</div>':''}
+        `);
+        $('#expenseSummaryContent').html(`
+            <p>Spent ${formatCurrency(totalActualExp)} of ${formatCurrency(totalBudgetExp)}</p>
+            <div class="progress"><div class="progress-bar ${expClass}" style="width:${Math.min(expPercent,100)}%">${expPercent.toFixed(0)}%</div></div>
+        `);
+    }
+
+    $(document).on('click', '.editable-budget', function(){
+        const span = $(this);
+        if(span.find('input').length) return;
+        const current = parseFloat(span.data('amount')) || 0;
+        const input = $('<input type="number" class="form-control form-control-sm" style="width:100px;">').val(current.toFixed(2));
+        span.empty().append(input);
+        input.focus();
+        input.on('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); this.blur(); }});
+        input.on('blur', function(){
+            const newVal = parseFloat(input.val());
+            if(isNaN(newVal)) { span.text(formatCurrency(current)); return; }
+            $.ajax({
+                url: `/api/budget/${currentMonth}/update`,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ category_id: span.data('id'), amount: newVal }),
+                success: function(){ showToast('Budget updated'); loadBudgetForMonth(); },
+                error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error updating budget: '+error,'error'); loadBudgetForMonth(); }
+            });
+        });
+    });
 </script>
 {% endblock %}
