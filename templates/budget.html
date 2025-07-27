@@ -262,7 +262,7 @@
     function loadCategories() {
         $.get(`/api/budget/${currentMonth}`, function(data) {
             allCategories = data;
-            
+
             const incomeCategories = data.filter(c => c.type === 'income' && !c.name.toLowerCase().includes('deduction'));
             const deductionCategories = data.filter(c => c.type === 'income' && c.name.toLowerCase().includes('deduction'));
             const expenseCategories = data.filter(c => c.type === 'expense');
@@ -368,37 +368,95 @@
     
     function displayCategories(categories, containerId) {
         const container = $('#' + containerId);
-        
+
         if (categories.length === 0) {
             container.html('<p class="text-muted">No categories added yet. Click "Add" to create your first category.</p>');
             return;
         }
-        
-        let html = '';
+
+        const groups = {};
         categories.forEach(cat => {
-            const isCustom = cat.is_custom;
-            html += `
-                <div class="category-item ${isCustom ? 'custom-budget' : ''}">
-                    <div class="category-info">
-                        <h6 class="mb-1">
-                            ${cat.name}
-                            ${isCustom ? '<span class="custom-badge">Custom</span>' : '<span class="default-badge">Default</span>'}
-                        </h6>
-                        <small class="text-muted">Budget: ${formatCurrency(cat.monthly_budget)}/month</small>
-                    </div>
-                    <div>
-                        <button class="btn btn-sm btn-outline-primary me-2" onclick="editBudgetForMonth(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', ${cat.monthly_budget})">
-                            <i class="fas fa-edit"></i> Edit This Month
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${cat.id})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
+            const group = cat.parent_category || 'Other';
+            if (!groups[group]) groups[group] = [];
+            groups[group].push(cat);
         });
-        
+
+        let html = '';
+        Object.keys(groups).sort().forEach(g => {
+            const safeId = g.replace(/\s+/g, '-');
+            html += `<div class="mb-3 category-group">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">${g}</h6>
+                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">Toggle</button>
+                        </div>
+                        <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
+
+            groups[g].sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
+                const isCustom = cat.is_custom;
+                html += `
+                    <div class="category-item ${isCustom ? 'custom-budget' : ''}" data-id="${cat.id}">
+                        <div class="category-info">
+                            <h6 class="mb-1">
+                                ${cat.name}
+                                ${isCustom ? '<span class="custom-badge">Custom</span>' : '<span class="default-badge">Default</span>'}
+                            </h6>
+                            <small class="text-muted">Budget: ${formatCurrency(cat.monthly_budget)}/month</small>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="editBudgetForMonth(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', ${cat.monthly_budget})">Edit $ This Month</a></li>
+                                <li><a class="dropdown-item" href="#" onclick='editCategory(${JSON.stringify(cat)})'>Edit Category</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteCategory(${cat.id})">Delete</a></li>
+                            </ul>
+                        </div>
+                    </div>`;
+            });
+
+            html += '</div></div>';
+        });
+
         container.html(html);
+
+        container.find('.group-categories').sortable({
+            update: function(event, ui) {
+                saveOrder(containerId);
+            }
+        });
+    }
+
+    function saveOrder(containerId) {
+        const order = [];
+        $('#' + containerId + ' .category-item').each(function(i, el) {
+            order.push({id: $(el).data('id'), sort_order: i});
+        });
+        $.ajax({
+            url: '/api/categories/reorder',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({order: order}),
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error saving order: ' + error, 'error');
+            }
+        });
+    }
+
+    function editCategory(cat) {
+        const newName = prompt('Category Name', cat.name);
+        if (newName === null) return;
+        const newBudget = prompt('Default Monthly Budget', cat.default_budget);
+        if (newBudget === null || isNaN(newBudget)) return;
+        const newGroup = prompt('Group', cat.parent_category || '');
+        $.ajax({
+            url: `/api/categories/${cat.id}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({name:newName, default_budget:parseFloat(newBudget), parent_category:newGroup}),
+            success: function(){ showToast('Category updated'); loadBudgetForMonth(); },
+            error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error: '+error,'error'); }
+        });
     }
     
     function updateAllDefaults() {
