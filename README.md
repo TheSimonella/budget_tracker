@@ -12,6 +12,7 @@ A personal budgeting application built with **Flask** and **SQLite**. It lets yo
 - Report pages (monthly summary, annual overview, category analysis, spending trends)
 - CSV and JSON export of all data and placeholder support for Excel import
 - REST style API endpoints used by the front end (can also be reused by other tools)
+- Automatic detection of recurring subscriptions with optional renewal notifications
 
 ## Repository structure
 

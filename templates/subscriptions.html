@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Subscriptions - Budget Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">Subscriptions</h4>
+    <button class="btn btn-modern-primary" onclick="detectSubscriptions()">
+        <i class="fas fa-search me-1"></i> Detect Subscriptions
+    </button>
+</div>
+<div class="modern-card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table modern-table mb-0" id="subscriptionsTable">
+                <thead>
+                    <tr>
+                        <th>Merchant</th>
+                        <th>Amount</th>
+                        <th>Next Renewal</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadSubscriptions() {
+    const res = await fetch('/api/subscriptions');
+    const data = await res.json();
+    const body = document.querySelector('#subscriptionsTable tbody');
+    body.innerHTML = '';
+    data.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${s.merchant}</td><td>$${s.amount.toFixed(2)}</td><td>${s.next_renewal}</td>`;
+        body.appendChild(tr);
+    });
+}
+async function detectSubscriptions() {
+    await fetch('/api/subscriptions/detect', {method:'POST'});
+    loadSubscriptions();
+}
+
+document.addEventListener('DOMContentLoaded', loadSubscriptions);
+</script>
+{% endblock %}
