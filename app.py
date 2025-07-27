@@ -1501,5 +1501,4 @@ if __name__ == '__main__':
         print("\nCommon issues:")
         print("1. Port 5000 might be in use - try closing other applications")
         print("2. Missing dependencies - run: pip install -r requirements.txt")
-        print("3. Python version issues - make sure you're using Python 3.8+")
         input("\nPress Enter to exit...")
