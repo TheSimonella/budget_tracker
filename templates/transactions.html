@@ -108,9 +108,14 @@
 <!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">Transactions</h4>
-    <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
-        <i class="fas fa-plus me-1"></i> Add Transaction
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-modern-secondary" data-bs-toggle="modal" data-bs-target="#importPlaidModal">
+            <i class="fas fa-file-import me-1"></i> Import from Plaid
+        </button>
+        <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+            <i class="fas fa-plus me-1"></i> Add Transaction
+        </button>
+    </div>
 </div>
 
 <!-- Filters -->
@@ -239,6 +244,40 @@
                 <button type="button" class="btn btn-modern-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-modern-primary" onclick="saveTransaction()">Save Transaction</button>
             </div>
+</div>
+</div>
+</div>
+
+<!-- Import Plaid Modal -->
+<div class="modal fade" id="importPlaidModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title">Import from Plaid</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="importPlaidForm">
+                    <div class="mb-3">
+                        <label class="form-label small">Access Token</label>
+                        <input type="text" class="form-control" name="access_token" id="plaid_access_token" required>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">Start Date</label>
+                            <input type="date" class="form-control" name="start_date" id="plaid_start_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">End Date</label>
+                            <input type="date" class="form-control" name="end_date" id="plaid_end_date" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-modern-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-modern-primary" onclick="importPlaid()">Import</button>
+            </div>
         </div>
     </div>
 </div>
@@ -316,6 +355,11 @@
         loadCategories();
         loadTransactions();
         $('input[name="date"]').val(new Date().toISOString().split('T')[0]);
+
+        const firstOfMonth = new Date();
+        firstOfMonth.setDate(1);
+        $('#plaid_start_date').val(firstOfMonth.toISOString().split('T')[0]);
+        $('#plaid_end_date').val(new Date().toISOString().split('T')[0]);
         
         $('select[name="transaction_type"]').change(function() {
             updateCategoryDropdown($(this).val());
@@ -587,6 +631,37 @@
                 }
             });
         }
+    }
+
+    function importPlaid() {
+        const button = $('#importPlaidModal .btn-modern-primary');
+        const data = {
+            access_token: $('#plaid_access_token').val(),
+            start_date: $('#plaid_start_date').val(),
+            end_date: $('#plaid_end_date').val()
+        };
+
+        setButtonLoading(button, true);
+
+        $.ajax({
+            url: '/api/import-plaid',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(resp) {
+                $('#importPlaidModal').modal('hide');
+                $('#importPlaidForm')[0].reset();
+                showToast(resp.message || 'Import completed!');
+                loadTransactions();
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error: ' + error, 'error');
+            },
+            complete: function() {
+                setButtonLoading(button, false);
+            }
+        });
     }
 </script>
 {% endblock %}

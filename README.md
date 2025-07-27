@@ -11,6 +11,7 @@ A personal budgeting application built with **Flask** and **SQLite**. It lets yo
 - Savings funds with progress tracking and recommended contributions
 - Report pages (monthly summary, annual overview, category analysis, spending trends)
 - CSV and JSON export of all data and placeholder support for Excel import
+- Plaid import: fetch transactions from linked accounts via the "Import from Plaid" button
 - REST style API endpoints used by the front end (can also be reused by other tools)
 
 ## Repository structure
@@ -76,7 +77,7 @@ If database changes are required, the helper function `migrate_database()` in `a
 
  The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`. An Excel import endpoint exists (`/api/import-excel`) as a placeholder – adapt the implementation to match your spreadsheet format if needed.
 
-A dedicated endpoint `/api/import-plaid` allows importing transactions directly from [Plaid](https://plaid.com/). Provide an `access_token`, `start_date` and `end_date` in the request body to retrieve transactions from linked accounts. New categories are created automatically when a matching one does not already exist. Set the environment variables `PLAID_CLIENT_ID` and `PLAID_SECRET` with your Plaid credentials before running the server.
+A dedicated endpoint `/api/import-plaid` allows importing transactions directly from [Plaid](https://plaid.com/). The Transactions page exposes this through an **Import from Plaid** button where you provide an `access_token`, `start_date` and `end_date`. New categories are created automatically when a matching one does not already exist. Set the environment variables `PLAID_CLIENT_ID` and `PLAID_SECRET` with your Plaid credentials before running the server.
 
 ## Troubleshooting
 
