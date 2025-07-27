@@ -108,9 +108,12 @@
 <!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">Transactions</h4>
-    <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
-        <i class="fas fa-plus me-1"></i> Add Transaction
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-modern-secondary" id="connectPlaidBtn">Connect Account</button>
+        <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+            <i class="fas fa-plus me-1"></i> Add Transaction
+        </button>
+    </div>
 </div>
 
 <!-- Filters -->
@@ -316,6 +319,10 @@
         loadCategories();
         loadTransactions();
         $('input[name="date"]').val(new Date().toISOString().split('T')[0]);
+
+        $('#connectPlaidBtn').click(function() {
+            openPlaidLink();
+        });
         
         $('select[name="transaction_type"]').change(function() {
             updateCategoryDropdown($(this).val());
@@ -587,6 +594,64 @@
                 }
             });
         }
+    }
+
+    function openPlaidLink() {
+        const button = $('#connectPlaidBtn');
+        setButtonLoading(button, true);
+        $.ajax({
+            url: '/api/plaid/link-token',
+            method: 'POST',
+            success: function(res) {
+                const handler = Plaid.create({
+                    token: res.link_token,
+                    onSuccess: function(public_token, metadata) {
+                        $.ajax({
+                            url: '/api/plaid/exchange',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({
+                                public_token: public_token,
+                                institution: metadata.institution?.name,
+                                account_name: metadata.account?.name
+                            }),
+                            complete: function() {
+                                importFromPlaid();
+                            }
+                        });
+                    },
+                    onExit: function() {
+                        setButtonLoading(button, false);
+                    }
+                });
+                handler.open();
+            },
+            error: function() {
+                showToast('Unable to create link token', 'error');
+                setButtonLoading(button, false);
+            }
+        });
+    }
+
+    function importFromPlaid() {
+        const button = $('#connectPlaidBtn');
+        setButtonLoading(button, true);
+        $.ajax({
+            url: '/api/plaid/import',
+            method: 'POST',
+            contentType: 'application/json',
+            success: function() {
+                showToast('Transactions imported');
+                loadTransactions();
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Import failed';
+                showToast('Error: ' + error, 'error');
+            },
+            complete: function() {
+                setButtonLoading(button, false);
+            }
+        });
     }
 </script>
 {% endblock %}

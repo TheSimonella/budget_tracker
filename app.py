@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
-import os, json, calendar, csv, io
+import os, json, calendar, csv, io, uuid
+import requests
 from werkzeug.utils import secure_filename
 from sqlalchemy import extract, func, or_
 
@@ -14,6 +15,28 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db = SQLAlchemy(app)
+
+PLAID_CLIENT_ID = os.environ.get('PLAID_CLIENT_ID')
+PLAID_SECRET = os.environ.get('PLAID_SECRET')
+PLAID_ENV = os.environ.get('PLAID_ENV', 'sandbox')
+
+PLAID_BASE_URLS = {
+    'sandbox': 'https://sandbox.plaid.com',
+    'development': 'https://development.plaid.com',
+    'production': 'https://production.plaid.com'
+}
+
+def plaid_post(endpoint, payload):
+    """Helper to call Plaid API or return None if not configured"""
+    if not PLAID_CLIENT_ID or not PLAID_SECRET:
+        return None
+
+    url = PLAID_BASE_URLS.get(PLAID_ENV, PLAID_BASE_URLS['sandbox']) + endpoint
+    data = {'client_id': PLAID_CLIENT_ID, 'secret': PLAID_SECRET}
+    data.update(payload)
+    resp = requests.post(url, json=data, timeout=15)
+    resp.raise_for_status()
+    return resp.json()
 
 ####
 # Models
@@ -70,6 +93,14 @@ class Subscription(db.Model):
     email = db.Column(db.String(120))
     active = db.Column(db.Boolean, default=True)
 
+class LinkedAccount(db.Model):
+    """Store credentials for linked Plaid accounts"""
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.String(100), nullable=False)
+    access_token = db.Column(db.String(200), nullable=False)
+    institution = db.Column(db.String(100))
+    name = db.Column(db.String(100))
+
 ####
 # Helper Functions
 ####
@@ -108,6 +139,19 @@ def calculate_recommended_contribution(fund):
     
     remaining_amount = fund.goal - fund.current_balance
     return max(0, remaining_amount / months_remaining)
+
+def match_or_create_category(plaid_category):
+    """Match Plaid category to existing Category or create a new one"""
+    if isinstance(plaid_category, list):
+        plaid_category = plaid_category[-1] if plaid_category else 'Misc'
+    name = (plaid_category or 'Misc').strip()
+    cat = Category.query.filter(func.lower(Category.name) == name.lower()).first()
+    if cat:
+        return cat
+    cat = Category(name=name, type='expense', parent_category='Expenses')
+    db.session.add(cat)
+    db.session.commit()
+    return cat
 
 def detect_subscriptions():
     """Simple heuristic to identify recurring transactions by merchant and amount."""
@@ -1412,6 +1456,98 @@ def detect_subscriptions_endpoint():
 def notify_subscriptions():
     count = send_subscription_notifications()
     return jsonify({'notifications_sent': count})
+
+####
+# API: Plaid integration
+####
+
+@app.route('/api/plaid/link-token', methods=['POST'])
+def create_plaid_link_token():
+    """Create a Link token for Plaid Link"""
+    resp = plaid_post('/link/token/create', {
+        'client_name': 'Budget Tracker',
+        'language': 'en',
+        'country_codes': ['US'],
+        'user': {'client_user_id': str(uuid.uuid4())},
+        'products': ['transactions']
+    })
+    if resp is None:
+        # Return mock token when Plaid not configured
+        return jsonify({'link_token': str(uuid.uuid4())})
+    return jsonify({'link_token': resp.get('link_token')})
+
+
+@app.route('/api/plaid/exchange', methods=['POST'])
+def exchange_public_token():
+    """Exchange public token for access token and store account"""
+    data = request.json or {}
+    public_token = data.get('public_token')
+    if not public_token:
+        return jsonify({'error': 'public_token required'}), 400
+    if (resp := plaid_post('/item/public_token/exchange', {'public_token': public_token})):
+        access_token = resp['access_token']
+        item_id = resp['item_id']
+    else:
+        access_token = 'mock-' + public_token
+        item_id = str(uuid.uuid4())
+
+    account = LinkedAccount(item_id=item_id, access_token=access_token,
+                            institution=data.get('institution'),
+                            name=data.get('account_name'))
+    db.session.add(account)
+    db.session.commit()
+    return jsonify({'account_id': account.id})
+
+
+@app.route('/api/plaid/accounts')
+def list_plaid_accounts():
+    accounts = LinkedAccount.query.all()
+    return jsonify([{ 'id': a.id, 'name': a.name, 'institution': a.institution } for a in accounts])
+
+
+@app.route('/api/plaid/import', methods=['POST'])
+def import_plaid_transactions():
+    """Import transactions from Plaid or provided list"""
+    data = request.json or {}
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+    imported = 0
+
+    tx_data = data.get('transactions')
+    if tx_data is None:
+        if not start_date:
+            start_date = (datetime.now().date() - timedelta(days=30)).isoformat()
+        if not end_date:
+            end_date = datetime.now().date().isoformat()
+        tx_data = []
+        for acc in LinkedAccount.query.all():
+            resp = plaid_post('/transactions/get', {
+                'access_token': acc.access_token,
+                'start_date': start_date,
+                'end_date': end_date,
+                'options': {'count': 500}
+            })
+            if resp and resp.get('transactions'):
+                tx_data.extend(resp['transactions'])
+
+    for t in tx_data or []:
+        desc = t.get('name')
+        date_str = t.get('date')
+        if not desc or not date_str:
+            continue
+        amount = abs(float(t.get('amount', 0)))
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+        if Transaction.query.filter_by(description=desc, amount=amount, date=date_obj).first():
+            continue
+        cat = match_or_create_category(t.get('category', []))
+        tx = Transaction(amount=amount, transaction_type='expense',
+                         category_id=cat.id, description=desc,
+                         merchant=t.get('merchant_name'), date=date_obj)
+        db.session.add(tx)
+        imported += 1
+
+    db.session.commit()
+    return jsonify({'imported': imported})
 
 # Database initialization function
 def init_database():

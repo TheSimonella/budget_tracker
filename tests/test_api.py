@@ -71,3 +71,23 @@ def test_detect_subscriptions(client):
     subs = resp.get_json()
     assert any('netflix' in s['merchant'] for s in subs)
 
+
+def test_plaid_import_mock(client):
+    resp = client.post('/api/plaid/import', json={
+        'transactions': [
+            {
+                'name': 'Coffee Shop',
+                'amount': 4.5,
+                'date': '2023-01-02',
+                'category': ['Food']
+            }
+        ]
+    })
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['imported'] == 1
+
+    resp = client.get('/api/transactions')
+    txs = resp.get_json()
+    assert any(t['description'] == 'Coffee Shop' for t in txs)
+
