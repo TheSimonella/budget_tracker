@@ -11,3 +11,33 @@
   --navbar-background-color: #212529;
   --card-background-color: #343a40;
 }
+
+/* Apply variable-based backgrounds */
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.card,
+.modal-content,
+.filter-bar,
+.add-category-form,
+.recommendation-box,
+.dropdown-menu {
+  background-color: var(--card-background-color);
+  color: var(--text-color);
+}
+
+.form-control,
+.form-select {
+  background-color: var(--card-background-color);
+  color: var(--text-color);
+}
+
+.form-control::placeholder {
+  color: var(--gray-600);
+}
+
+[data-theme='dark'] .text-muted {
+  color: #adb5bd !important;
+}
