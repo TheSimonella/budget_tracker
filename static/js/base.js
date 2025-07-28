@@ -9,8 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  const stored = localStorage.getItem('theme') || 'light';
-  applyTheme(stored);
+  const stored = localStorage.getItem('theme');
+  if (stored) {
+    applyTheme(stored);
+  } else {
+    applyTheme(root.dataset.theme || 'light');
+  }
 
   if (btn) {
     btn.addEventListener('click', () => {
