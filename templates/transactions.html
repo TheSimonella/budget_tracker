@@ -108,9 +108,14 @@
 <!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">Transactions</h4>
-    <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
-        <i class="fas fa-plus me-1"></i> Add Transaction
-    </button>
+    <div>
+        <button class="btn btn-modern-secondary me-2" onclick="connectAccount()" {% if not plaid_enabled %}title="Plaid not configured"{% endif %}>
+            <i class="fas fa-university me-1"></i> Connect Account
+        </button>
+        <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+            <i class="fas fa-plus me-1"></i> Add Transaction
+        </button>
+    </div>
 </div>
 
 <!-- Filters -->
@@ -306,7 +311,10 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <script>
+    const PLAID_ENABLED = {{ 'true' if plaid_enabled else 'false' }};
+    const PLAID_CREDS_NEEDED = {{ 'true' if creds_needed else 'false' }};
     let categories = [];
     let currentMonth = new Date().toISOString().slice(0, 7);
     let editingTransactionId = null;
@@ -587,6 +595,45 @@
                 }
             });
         }
+    }
+
+    function connectAccount() {
+        const w = 600, h = 650;
+        const left = (screen.width - w) / 2;
+        const top = (screen.height - h) / 2;
+        if (PLAID_CREDS_NEEDED) {
+            window.open('/plaid/config?next=/plaid/connect', 'plaidConfig', `width=${w},height=${h},left=${left},top=${top}`);
+            return;
+        }
+        if (!PLAID_ENABLED) {
+            showToast('Plaid is not configured', 'error');
+            return;
+        }
+        window.open('/plaid/connect', 'plaidLink', `width=${w},height=${h},left=${left},top=${top}`);
+    }
+
+    window.addEventListener('message', function(evt) {
+        if (evt.data && evt.data.type === 'plaid-linked') {
+            showToast('Account connected!');
+            importFromPlaid();
+        }
+    });
+
+    function importFromPlaid() {
+        $.ajax({
+            url: '/api/plaid/import-transactions',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({}),
+            success: function(resp) {
+                showToast(resp.message);
+                loadTransactions();
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Error importing transactions';
+                showToast(error, 'error');
+            }
+        });
     }
 </script>
 {% endblock %}

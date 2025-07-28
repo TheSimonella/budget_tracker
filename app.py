@@ -1,9 +1,30 @@
-from flask import Flask, render_template, request, jsonify, send_file, Response
+from flask import Flask, render_template, request, jsonify, send_file, Response, redirect
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
-import os, json, calendar, csv, io
+import os, json, calendar, csv, io, uuid
 from werkzeug.utils import secure_filename
 from sqlalchemy import extract, func, or_
+from cryptography.fernet import Fernet
+
+# Plaid imports are optional so the app can run without the dependency
+try:
+    from plaid import ApiClient, Configuration, Environment
+    from plaid.api import plaid_api
+    from plaid.model.link_token_create_request import (
+        LinkTokenCreateRequest,
+        LinkTokenCreateRequestUser,
+    )
+    from plaid.model.item_public_token_exchange_request import (
+        ItemPublicTokenExchangeRequest,
+    )
+    from plaid.model.transactions_get_request import TransactionsGetRequest
+    from plaid.model.transactions_get_request_options import (
+        TransactionsGetRequestOptions,
+    )
+    from plaid.model.accounts_get_request import AccountsGetRequest
+except Exception:  # pragma: no cover - plaid not installed
+    ApiClient = Configuration = Environment = None
+    plaid_api = None
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///budget_tracker.db'
@@ -14,6 +35,9 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db = SQLAlchemy(app)
+
+# Plaid client cache
+plaid_client_cache = None
 
 ####
 # Models
@@ -43,6 +67,8 @@ class Transaction(db.Model):
     merchant = db.Column(db.String(100))
     date = db.Column(db.Date, nullable=False)
     notes = db.Column(db.String(300))
+    plaid_id = db.Column(db.String(120), unique=True)
+    account_id = db.Column(db.String(100))
 
 class Fund(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -70,9 +96,69 @@ class Subscription(db.Model):
     email = db.Column(db.String(120))
     active = db.Column(db.Boolean, default=True)
 
+# Linked Plaid item storing access tokens
+class PlaidItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.String(120), unique=True, nullable=False)
+    access_token = db.Column(db.String(200), nullable=False)
+    institution_name = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Individual accounts under a Plaid item
+class PlaidAccount(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.String(120), db.ForeignKey('plaid_item.item_id'))
+    account_id = db.Column(db.String(120), unique=True, nullable=False)
+    name = db.Column(db.String(100))
+    mask = db.Column(db.String(10))
+    subtype = db.Column(db.String(50))
+    plaid_item = db.relationship('PlaidItem', backref='accounts')
+
+# Stored Plaid credentials (encrypted)
+class PlaidCredentials(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    client_id_encrypted = db.Column(db.String(300))
+    secret_encrypted = db.Column(db.String(300))
+    environment = db.Column(db.String(20), default='sandbox')
+
 ####
 # Helper Functions
 ####
+def get_plaid_client():
+    """Return a configured Plaid client using stored credentials"""
+    global plaid_client_cache
+    if plaid_client_cache is not None:
+        return plaid_client_cache
+    if ApiClient is None:
+        return None
+    creds = PlaidCredentials.query.first()
+    key = os.getenv('PLAID_ENC_KEY')
+    if not creds or not key:
+        return None
+    try:
+        f = Fernet(key.encode())
+        client_id = f.decrypt(creds.client_id_encrypted.encode()).decode()
+        secret = f.decrypt(creds.secret_encrypted.encode()).decode()
+    except Exception:
+        return None
+
+    configuration = Configuration(
+        host=Environment.Sandbox,
+        api_key={"clientId": client_id, "secret": secret},
+    )
+    env = (creds.environment or 'sandbox').lower()
+    if env == 'development':
+        configuration.host = Environment.Development
+    elif env == 'production':
+        configuration.host = Environment.Production
+
+    plaid_client_cache = plaid_api.PlaidApi(ApiClient(configuration))
+    return plaid_client_cache
+
+def is_plaid_configured():
+    """Check whether Plaid credentials and library are available"""
+    return get_plaid_client() is not None
+
 def validate_amount(amount):
     """Validate that amount is a positive number"""
     try:
@@ -163,7 +249,7 @@ def dashboard():
 
 @app.route('/transactions')
 def transactions_view():
-    return render_template('transactions.html')
+    return render_template('transactions.html', plaid_enabled=is_plaid_configured(), creds_needed=PlaidCredentials.query.first() is None)
 
 @app.route('/budget')
 def budget_view():
@@ -180,6 +266,41 @@ def reports_view():
 @app.route('/subscriptions')
 def subscriptions_view():
     return render_template('subscriptions.html')
+
+@app.route('/plaid/connect')
+def plaid_connect_page():
+    if not is_plaid_configured():
+        return "Plaid not configured", 400
+    return render_template('plaid_connect.html')
+
+@app.route('/plaid/config', methods=['GET', 'POST'])
+def plaid_config_page():
+    key = os.getenv('PLAID_ENC_KEY')
+    if not key:
+        return "PLAID_ENC_KEY not set", 500
+    creds = PlaidCredentials.query.first()
+    if request.method == 'POST':
+        client_id = request.form.get('client_id', '').strip()
+        secret = request.form.get('secret', '').strip()
+        env = request.form.get('env', 'sandbox').lower()
+        if client_id and secret:
+            f = Fernet(key.encode())
+            enc_client = f.encrypt(client_id.encode()).decode()
+            enc_secret = f.encrypt(secret.encode()).decode()
+            if creds:
+                creds.client_id_encrypted = enc_client
+                creds.secret_encrypted = enc_secret
+                creds.environment = env
+            else:
+                creds = PlaidCredentials(client_id_encrypted=enc_client, secret_encrypted=enc_secret, environment=env)
+                db.session.add(creds)
+            db.session.commit()
+            global plaid_client_cache
+            plaid_client_cache = None
+            next_url = request.args.get('next') or '/transactions'
+            return redirect(next_url)
+    env = creds.environment if creds else 'sandbox'
+    return render_template('plaid_config.html', env=env)
 
 ####
 # API: Dashboard
@@ -1413,6 +1534,149 @@ def notify_subscriptions():
     count = send_subscription_notifications()
     return jsonify({'notifications_sent': count})
 
+####
+# API: Plaid Integration
+####
+
+@app.route('/api/plaid/link-token', methods=['POST'])
+def plaid_link_token():
+    plaid_client = get_plaid_client()
+    if plaid_client is None:
+        return jsonify({'error': 'Plaid not configured'}), 500
+    try:
+        request_data = LinkTokenCreateRequest(
+            products=['transactions'],
+            client_name='Budget Tracker',
+            country_codes=['US'],
+            language='en',
+            user=LinkTokenCreateRequestUser(client_user_id=str(uuid.uuid4())),
+        )
+        response = plaid_client.link_token_create(request_data)
+        return jsonify({'link_token': response.link_token})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/plaid/exchange', methods=['POST'])
+def plaid_exchange():
+    plaid_client = get_plaid_client()
+    if plaid_client is None:
+        return jsonify({'error': 'Plaid not configured'}), 500
+    public_token = request.json.get('public_token')
+    if not public_token:
+        return jsonify({'error': 'public_token required'}), 400
+    try:
+        exchange_request = ItemPublicTokenExchangeRequest(public_token=public_token)
+        exchange_response = plaid_client.item_public_token_exchange(exchange_request)
+        access_token = exchange_response.access_token
+        item_id = exchange_response.item_id
+
+        # Store item
+        item = PlaidItem.query.filter_by(item_id=item_id).first()
+        if not item:
+            item = PlaidItem(item_id=item_id, access_token=access_token)
+            db.session.add(item)
+        else:
+            item.access_token = access_token
+        db.session.commit()
+
+        # Fetch accounts for this item
+        acc_req = AccountsGetRequest(access_token=access_token)
+        acc_resp = plaid_client.accounts_get(acc_req)
+        for acc in acc_resp.accounts:
+            account = PlaidAccount.query.filter_by(account_id=acc.account_id).first()
+            if not account:
+                account = PlaidAccount(
+                    item_id=item_id,
+                    account_id=acc.account_id,
+                    name=acc.name,
+                    mask=acc.mask,
+                    subtype=acc.subtype,
+                )
+                db.session.add(account)
+        db.session.commit()
+        return jsonify({'message': 'Account connected'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/plaid/accounts')
+def list_plaid_accounts():
+    accounts = PlaidAccount.query.all()
+    return jsonify([
+        {
+            'id': a.id,
+            'account_id': a.account_id,
+            'name': a.name,
+            'mask': a.mask,
+            'subtype': a.subtype,
+        }
+        for a in accounts
+    ])
+
+
+@app.route('/api/plaid/import-transactions', methods=['POST'])
+def import_plaid_transactions():
+    plaid_client = get_plaid_client()
+    if plaid_client is None:
+        return jsonify({'error': 'Plaid not configured'}), 500
+
+    start_date = request.json.get('start_date')
+    end_date = request.json.get('end_date')
+    if not start_date:
+        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    if not end_date:
+        end_date = datetime.now().strftime('%Y-%m-%d')
+
+    imported = 0
+    for item in PlaidItem.query.all():
+        try:
+            req_options = TransactionsGetRequestOptions()
+            tx_req = TransactionsGetRequest(
+                access_token=item.access_token,
+                start_date=start_date,
+                end_date=end_date,
+                options=req_options,
+            )
+            tx_resp = plaid_client.transactions_get(tx_req)
+            for tx in tx_resp.transactions:
+                if Transaction.query.filter_by(plaid_id=tx.transaction_id).first():
+                    continue
+                # determine type
+                tx_type = 'expense'
+                amt = tx.amount
+                if amt < 0:
+                    tx_type = 'income'
+                    amt = abs(amt)
+
+                cat_name = tx.personal_finance_category.primary if tx.personal_finance_category else (tx.category[0] if tx.category else 'Uncategorized')
+                category = Category.query.filter_by(name=cat_name).first()
+                if not category:
+                    category = Category(name=cat_name, type='income' if tx_type == 'income' else 'expense', parent_category='Imported', is_custom=True)
+                    db.session.add(category)
+                    db.session.commit()
+
+                new_tx = Transaction(
+                    amount=amt,
+                    transaction_type=tx_type,
+                    category_id=category.id,
+                    description=tx.name,
+                    merchant=tx.merchant_name or '',
+                    date=tx.date,
+                    notes='',
+                    plaid_id=tx.transaction_id,
+                    account_id=tx.account_id,
+                )
+                db.session.add(new_tx)
+                imported += 1
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
+
+    return jsonify({'message': f'{imported} transactions imported'})
+
 # Database initialization function
 def init_database():
     """Initialize the database with default categories"""
@@ -1497,11 +1761,23 @@ def migrate_database():
         if cursor.fetchone():
             cursor.execute("PRAGMA table_info(fund)")
             fund_columns = [column[1] for column in cursor.fetchall()]
-            
+
             if 'monthly_contribution' not in fund_columns:
                 cursor.execute("ALTER TABLE fund ADD COLUMN monthly_contribution REAL DEFAULT 0.0")
                 conn.commit()
                 print("✓ Added monthly_contribution column to fund table")
+
+        # Check transaction table for new plaid columns
+        cursor.execute("PRAGMA table_info(transaction)")
+        tx_columns = [column[1] for column in cursor.fetchall()]
+        if 'plaid_id' not in tx_columns:
+            cursor.execute("ALTER TABLE transaction ADD COLUMN plaid_id TEXT")
+            conn.commit()
+            print("✓ Added plaid_id column to transaction table")
+        if 'account_id' not in tx_columns:
+            cursor.execute("ALTER TABLE transaction ADD COLUMN account_id TEXT")
+            conn.commit()
+            print("✓ Added account_id column to transaction table")
         
         conn.close()
     except Exception as e:

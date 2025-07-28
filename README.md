@@ -13,6 +13,7 @@ A personal budgeting application built with **Flask** and **SQLite**. It lets yo
 - CSV and JSON export of all data and placeholder support for Excel import
 - REST style API endpoints used by the front end (can also be reused by other tools)
 - Automatic detection of recurring subscriptions with optional renewal notifications
+- Connect bank accounts via Plaid and automatically import transactions
 
 ## Repository structure
 
@@ -64,6 +65,18 @@ python app.py
 ```
 
 The application will start on port 5000 and create `budget_tracker.db` in the project directory.
+
+### Plaid setup
+
+Set an encryption key using the environment variable `PLAID_ENC_KEY` before starting the app:
+
+```
+export PLAID_ENC_KEY=$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
+```
+
+After launching the server, open the Transactions page and click **Connect Account**. If no credentials are stored you will be prompted to enter your Plaid **Client ID**, **Secret**, and desired environment. These values are encrypted using the key above and saved in the database so you only need to enter them once. You can revisit `/plaid/config` to update or reset them at any time.
+
+Once credentials are saved the popup will proceed to Plaid Link where you can connect multiple accounts. Imported transactions will try to match existing categories or create new ones automatically.
 
 ## Customization
 
