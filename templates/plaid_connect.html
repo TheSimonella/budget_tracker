@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Connect Account{% endblock %}
+{% block content %}
+<div class="text-center my-5">
+    <h4>Connecting to your bank...</h4>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script>
+    $(function(){
+        $.post('/api/plaid/link-token', function(data){
+            if(!data.link_token){
+                alert('Error creating link token: ' + (data.error || ''));
+                window.close();
+                return;
+            }
+            const handler = Plaid.create({
+                token: data.link_token,
+                onSuccess: function(public_token){
+                    $.ajax({
+                        url: '/api/plaid/exchange',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({public_token}),
+                        success: function(){
+                            if(window.opener && !window.opener.closed){
+                                window.opener.postMessage({type: 'plaid-linked'}, '*');
+                            }
+                            window.close();
+                        },
+                        error: function(xhr){
+                            alert(xhr.responseJSON?.error || 'Error connecting account');
+                            window.close();
+                        }
+                    });
+                },
+                onExit: function(){
+                    window.close();
+                }
+            });
+            handler.open();
+        }).fail(function(xhr){
+            alert(xhr.responseJSON?.error || 'Error creating link token');
+            window.close();
+        });
+    });
+</script>
+{% endblock %}

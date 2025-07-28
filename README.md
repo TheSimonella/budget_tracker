@@ -77,6 +77,7 @@ PLAID_ENV=sandbox  # or development / production
 ```
 
 When viewing the Transactions page click **Connect Account** to link a bank via Plaid Link. Imported transactions will attempt to match existing categories or create new ones if needed.
+The button opens a small window where you complete the Plaid flow and once finished your transactions are imported automatically.
 
 ## Customization
 

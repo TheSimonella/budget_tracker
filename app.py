@@ -38,20 +38,20 @@ db = SQLAlchemy(app)
 # Initialize Plaid client if available
 plaid_client = None
 if ApiClient is not None:
-    configuration = Configuration(
-        host=Environment.Sandbox,
-        api_key={
-            "clientId": os.getenv("PLAID_CLIENT_ID", ""),
-            "secret": os.getenv("PLAID_SECRET", ""),
-        },
-    )
-    env = os.getenv("PLAID_ENV", "sandbox").lower()
-    if env == "development":
-        configuration.host = Environment.Development
-    elif env == "production":
-        configuration.host = Environment.Production
+    client_id = os.getenv("PLAID_CLIENT_ID")
+    secret = os.getenv("PLAID_SECRET")
+    if client_id and secret:
+        configuration = Configuration(
+            host=Environment.Sandbox,
+            api_key={"clientId": client_id, "secret": secret},
+        )
+        env = os.getenv("PLAID_ENV", "sandbox").lower()
+        if env == "development":
+            configuration.host = Environment.Development
+        elif env == "production":
+            configuration.host = Environment.Production
 
-    plaid_client = plaid_api.PlaidApi(ApiClient(configuration))
+        plaid_client = plaid_api.PlaidApi(ApiClient(configuration))
 
 ####
 # Models
@@ -221,7 +221,7 @@ def dashboard():
 
 @app.route('/transactions')
 def transactions_view():
-    return render_template('transactions.html')
+    return render_template('transactions.html', plaid_enabled=plaid_client is not None)
 
 @app.route('/budget')
 def budget_view():
@@ -238,6 +238,12 @@ def reports_view():
 @app.route('/subscriptions')
 def subscriptions_view():
     return render_template('subscriptions.html')
+
+@app.route('/plaid/connect')
+def plaid_connect_page():
+    if plaid_client is None:
+        return "Plaid not configured", 400
+    return render_template('plaid_connect.html')
 
 ####
 # API: Dashboard

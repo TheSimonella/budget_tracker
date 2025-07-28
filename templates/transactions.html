@@ -109,9 +109,11 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">Transactions</h4>
     <div>
+        {% if plaid_enabled %}
         <button class="btn btn-modern-secondary me-2" onclick="connectAccount()">
             <i class="fas fa-university me-1"></i> Connect Account
         </button>
+        {% endif %}
         <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
             <i class="fas fa-plus me-1"></i> Add Transaction
         </button>
@@ -596,33 +598,18 @@
     }
 
     function connectAccount() {
-        $.post('/api/plaid/link-token', function(data) {
-            if (!data.link_token) {
-                showToast('Error creating link token', 'error');
-                return;
-            }
-            const handler = Plaid.create({
-                token: data.link_token,
-                onSuccess: function(public_token) {
-                    $.ajax({
-                        url: '/api/plaid/exchange',
-                        method: 'POST',
-                        contentType: 'application/json',
-                        data: JSON.stringify({ public_token }),
-                        success: function() {
-                            showToast('Account connected!');
-                            importFromPlaid();
-                        },
-                        error: function(xhr) {
-                            const error = xhr.responseJSON?.error || 'Error connecting account';
-                            showToast(error, 'error');
-                        }
-                    });
-                }
-            });
-            handler.open();
-        });
+        const w = 600, h = 650;
+        const left = (screen.width - w) / 2;
+        const top = (screen.height - h) / 2;
+        window.open('/plaid/connect', 'plaidLink', `width=${w},height=${h},left=${left},top=${top}`);
     }
+
+    window.addEventListener('message', function(evt) {
+        if (evt.data && evt.data.type === 'plaid-linked') {
+            showToast('Account connected!');
+            importFromPlaid();
+        }
+    });
 
     function importFromPlaid() {
         $.ajax({
