@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, jsonify, send_file, Response
+from flask import Flask, render_template, request, jsonify, send_file, Response, redirect
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 import os, json, calendar, csv, io, uuid
 from werkzeug.utils import secure_filename
 from sqlalchemy import extract, func, or_
+from cryptography.fernet import Fernet
 
 # Plaid imports are optional so the app can run without the dependency
 try:
@@ -35,23 +36,8 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db = SQLAlchemy(app)
 
-# Initialize Plaid client if available
-plaid_client = None
-if ApiClient is not None:
-    client_id = os.getenv("PLAID_CLIENT_ID")
-    secret = os.getenv("PLAID_SECRET")
-    if client_id and secret:
-        configuration = Configuration(
-            host=Environment.Sandbox,
-            api_key={"clientId": client_id, "secret": secret},
-        )
-        env = os.getenv("PLAID_ENV", "sandbox").lower()
-        if env == "development":
-            configuration.host = Environment.Development
-        elif env == "production":
-            configuration.host = Environment.Production
-
-        plaid_client = plaid_api.PlaidApi(ApiClient(configuration))
+# Plaid client cache
+plaid_client_cache = None
 
 ####
 # Models
@@ -128,9 +114,51 @@ class PlaidAccount(db.Model):
     subtype = db.Column(db.String(50))
     plaid_item = db.relationship('PlaidItem', backref='accounts')
 
+# Stored Plaid credentials (encrypted)
+class PlaidCredentials(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    client_id_encrypted = db.Column(db.String(300))
+    secret_encrypted = db.Column(db.String(300))
+    environment = db.Column(db.String(20), default='sandbox')
+
 ####
 # Helper Functions
 ####
+def get_plaid_client():
+    """Return a configured Plaid client using stored credentials"""
+    global plaid_client_cache
+    if plaid_client_cache is not None:
+        return plaid_client_cache
+    if ApiClient is None:
+        return None
+    creds = PlaidCredentials.query.first()
+    key = os.getenv('PLAID_ENC_KEY')
+    if not creds or not key:
+        return None
+    try:
+        f = Fernet(key.encode())
+        client_id = f.decrypt(creds.client_id_encrypted.encode()).decode()
+        secret = f.decrypt(creds.secret_encrypted.encode()).decode()
+    except Exception:
+        return None
+
+    configuration = Configuration(
+        host=Environment.Sandbox,
+        api_key={"clientId": client_id, "secret": secret},
+    )
+    env = (creds.environment or 'sandbox').lower()
+    if env == 'development':
+        configuration.host = Environment.Development
+    elif env == 'production':
+        configuration.host = Environment.Production
+
+    plaid_client_cache = plaid_api.PlaidApi(ApiClient(configuration))
+    return plaid_client_cache
+
+def is_plaid_configured():
+    """Check whether Plaid credentials and library are available"""
+    return get_plaid_client() is not None
+
 def validate_amount(amount):
     """Validate that amount is a positive number"""
     try:
@@ -221,7 +249,7 @@ def dashboard():
 
 @app.route('/transactions')
 def transactions_view():
-    return render_template('transactions.html', plaid_enabled=plaid_client is not None)
+    return render_template('transactions.html', plaid_enabled=is_plaid_configured(), creds_needed=PlaidCredentials.query.first() is None)
 
 @app.route('/budget')
 def budget_view():
@@ -241,9 +269,38 @@ def subscriptions_view():
 
 @app.route('/plaid/connect')
 def plaid_connect_page():
-    if plaid_client is None:
+    if not is_plaid_configured():
         return "Plaid not configured", 400
     return render_template('plaid_connect.html')
+
+@app.route('/plaid/config', methods=['GET', 'POST'])
+def plaid_config_page():
+    key = os.getenv('PLAID_ENC_KEY')
+    if not key:
+        return "PLAID_ENC_KEY not set", 500
+    creds = PlaidCredentials.query.first()
+    if request.method == 'POST':
+        client_id = request.form.get('client_id', '').strip()
+        secret = request.form.get('secret', '').strip()
+        env = request.form.get('env', 'sandbox').lower()
+        if client_id and secret:
+            f = Fernet(key.encode())
+            enc_client = f.encrypt(client_id.encode()).decode()
+            enc_secret = f.encrypt(secret.encode()).decode()
+            if creds:
+                creds.client_id_encrypted = enc_client
+                creds.secret_encrypted = enc_secret
+                creds.environment = env
+            else:
+                creds = PlaidCredentials(client_id_encrypted=enc_client, secret_encrypted=enc_secret, environment=env)
+                db.session.add(creds)
+            db.session.commit()
+            global plaid_client_cache
+            plaid_client_cache = None
+            next_url = request.args.get('next') or '/transactions'
+            return redirect(next_url)
+    env = creds.environment if creds else 'sandbox'
+    return render_template('plaid_config.html', env=env)
 
 ####
 # API: Dashboard
@@ -1483,8 +1540,9 @@ def notify_subscriptions():
 
 @app.route('/api/plaid/link-token', methods=['POST'])
 def plaid_link_token():
+    plaid_client = get_plaid_client()
     if plaid_client is None:
-        return jsonify({'error': 'Plaid library not installed'}), 500
+        return jsonify({'error': 'Plaid not configured'}), 500
     try:
         request_data = LinkTokenCreateRequest(
             products=['transactions'],
@@ -1501,8 +1559,9 @@ def plaid_link_token():
 
 @app.route('/api/plaid/exchange', methods=['POST'])
 def plaid_exchange():
+    plaid_client = get_plaid_client()
     if plaid_client is None:
-        return jsonify({'error': 'Plaid library not installed'}), 500
+        return jsonify({'error': 'Plaid not configured'}), 500
     public_token = request.json.get('public_token')
     if not public_token:
         return jsonify({'error': 'public_token required'}), 400
@@ -1559,8 +1618,9 @@ def list_plaid_accounts():
 
 @app.route('/api/plaid/import-transactions', methods=['POST'])
 def import_plaid_transactions():
+    plaid_client = get_plaid_client()
     if plaid_client is None:
-        return jsonify({'error': 'Plaid library not installed'}), 500
+        return jsonify({'error': 'Plaid not configured'}), 500
 
     start_date = request.json.get('start_date')
     end_date = request.json.get('end_date')

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Plaid Configuration{% endblock %}
+{% block content %}
+<div class="container my-4" style="max-width:480px;">
+    <h4 class="mb-3">Plaid Credentials</h4>
+    <form method="post">
+        <div class="mb-3">
+            <label class="form-label">Client ID</label>
+            <input type="text" name="client_id" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Secret</label>
+            <input type="text" name="secret" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Environment</label>
+            <select name="env" class="form-select">
+                <option value="sandbox" {% if env=='sandbox' %}selected{% endif %}>Sandbox</option>
+                <option value="development" {% if env=='development' %}selected{% endif %}>Development</option>
+                <option value="production" {% if env=='production' %}selected{% endif %}>Production</option>
+            </select>
+        </div>
+        <button class="btn btn-modern-primary" type="submit">Save</button>
+    </form>
+</div>
+{% endblock %}

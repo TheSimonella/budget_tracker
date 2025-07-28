@@ -68,16 +68,15 @@ The application will start on port 5000 and create `budget_tracker.db` in the pr
 
 ### Plaid setup
 
-To enable automatic transaction import you need Plaid API credentials. Set the following environment variables before running the app:
+Set an encryption key using the environment variable `PLAID_ENC_KEY` before starting the app:
 
 ```
-PLAID_CLIENT_ID=<your id>
-PLAID_SECRET=<your secret>
-PLAID_ENV=sandbox  # or development / production
+export PLAID_ENC_KEY=$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
 ```
 
-When viewing the Transactions page click **Connect Account** to link a bank via Plaid Link. Imported transactions will attempt to match existing categories or create new ones if needed.
-The button opens a small window where you complete the Plaid flow and once finished your transactions are imported automatically.
+After launching the server, open the Transactions page and click **Connect Account**. If no credentials are stored you will be prompted to enter your Plaid **Client ID**, **Secret**, and desired environment. These values are encrypted using the key above and saved in the database so you only need to enter them once. You can revisit `/plaid/config` to update or reset them at any time.
+
+Once credentials are saved the popup will proceed to Plaid Link where you can connect multiple accounts. Imported transactions will try to match existing categories or create new ones automatically.
 
 ## Customization
 

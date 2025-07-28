@@ -314,6 +314,7 @@
 <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <script>
     const PLAID_ENABLED = {{ 'true' if plaid_enabled else 'false' }};
+    const PLAID_CREDS_NEEDED = {{ 'true' if creds_needed else 'false' }};
     let categories = [];
     let currentMonth = new Date().toISOString().slice(0, 7);
     let editingTransactionId = null;
@@ -604,7 +605,11 @@
         const w = 600, h = 650;
         const left = (screen.width - w) / 2;
         const top = (screen.height - h) / 2;
-        window.open('/plaid/connect', 'plaidLink', `width=${w},height=${h},left=${left},top=${top}`);
+        if (PLAID_CREDS_NEEDED) {
+            window.open('/plaid/config?next=/plaid/connect', 'plaidConfig', `width=${w},height=${h},left=${left},top=${top}`);
+        } else {
+            window.open('/plaid/connect', 'plaidLink', `width=${w},height=${h},left=${left},top=${top}`);
+        }
     }
 
     window.addEventListener('message', function(evt) {
