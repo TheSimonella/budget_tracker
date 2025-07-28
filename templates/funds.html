@@ -30,7 +30,8 @@
     }
     
     .recommendation-box {
-        background-color: #e7f3ff;
+        background-color: var(--card-background-color);
+        color: var(--text-color);
         border: 1px solid #b3d9ff;
         border-radius: 8px;
         padding: 15px;
@@ -44,7 +45,7 @@
     <div class="col-12">
         <h1 class="mb-4">
             <i class="fas fa-piggy-bank"></i> Savings Funds
-            <button class="btn btn-primary float-end" data-bs-toggle="modal" data-bs-target="#addFundModal">
+            <button class="btn btn-modern-primary float-end" data-bs-toggle="modal" data-bs-target="#addFundModal">
                 <i class="fas fa-plus"></i> Create Fund
             </button>
         </h1>
@@ -90,7 +91,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveFund()">Create Fund</button>
+                <button type="button" class="btn btn-modern-primary" onclick="saveFund()">Create Fund</button>
             </div>
         </div>
     </div>
