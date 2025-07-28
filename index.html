@@ -11,6 +11,28 @@
             box-sizing: border-box;
         }
 
+        /* Getting Started Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .modal-content-simple {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -294,6 +316,7 @@
                 <button class="tab-btn" onclick="switchTab('transactions', this)">Add Transaction</button>
                 <button class="tab-btn" onclick="switchTab('budget', this)">Budget Setup</button>
                 <button class="tab-btn" onclick="switchTab('import', this)">Import/Export</button>
+                <button class="btn btn-secondary" id="gettingStartedBtn" style="margin-left:auto;">Getting Started</button>
             </div>
         </div>
 
@@ -428,7 +451,16 @@
         </div>
     </div>
 
+    <div id="gettingStartedModal" class="modal-overlay">
+        <div class="modal-content-simple">
+            <h2>Getting Started</h2>
+            <p>Run <code>app.py</code> then visit <code>http://localhost:5000</code> to use the full application.</p>
+            <button id="closeGettingStarted" class="btn btn-secondary" style="margin-top:10px;">Close</button>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
+    <script src="static/js/base.js"></script>
     <script>
         // Global state
         let budgetData = {
@@ -911,6 +943,17 @@
             setTimeout(() => {
                 alert.remove();
             }, 5000);
+        }
+
+        // Getting Started modal
+        const gsBtn = document.getElementById('gettingStartedBtn');
+        const gsModal = document.getElementById('gettingStartedModal');
+        const gsClose = document.getElementById('closeGettingStarted');
+        if (gsBtn) {
+            gsBtn.addEventListener('click', () => gsModal.style.display = 'flex');
+        }
+        if (gsClose) {
+            gsClose.addEventListener('click', () => gsModal.style.display = 'none');
         }
     </script>
 </body>

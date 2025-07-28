@@ -216,13 +216,13 @@
                                 ` : ''}
                                 
                                 <div class="mt-3">
-                                    <button class="btn btn-sm btn-outline-primary" onclick="editFund(${fundId})">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editFund(${fundId})" title="Edit fund" data-bs-toggle="tooltip">
                                         <i class="fas fa-edit"></i> Edit
                                     </button>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="withdrawFrom(${fundId}, '${fundNameEscaped}')">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="withdrawFrom(${fundId}, '${fundNameEscaped}')" title="Withdraw from fund" data-bs-toggle="tooltip">
                                         <i class="fas fa-minus"></i> Withdraw
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFund(${fundId}, '${fundNameEscaped}')">
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFund(${fundId}, '${fundNameEscaped}')" title="Delete fund" data-bs-toggle="tooltip">
                                         <i class="fas fa-trash"></i> Delete
                                     </button>
                                 </div>

@@ -34,7 +34,7 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card report-card text-center" onclick="showReport('monthly-summary')">
             <div class="card-body">
-                <i class="fas fa-calendar-alt report-icon"></i>
+                <i class="fas fa-calendar-alt report-icon" data-bs-toggle="tooltip" title="Monthly summary"></i>
                 <h5 class="card-title">Monthly Summary</h5>
                 <p class="card-text">View income, expenses, and savings for any month</p>
             </div>
@@ -45,7 +45,7 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card report-card text-center" onclick="showReport('annual-overview')">
             <div class="card-body">
-                <i class="fas fa-chart-line report-icon"></i>
+                <i class="fas fa-chart-line report-icon" data-bs-toggle="tooltip" title="Annual overview"></i>
                 <h5 class="card-title">Annual Overview</h5>
                 <p class="card-text">Year-to-date performance and trends</p>
             </div>
@@ -56,7 +56,7 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card report-card text-center" onclick="showReport('category-analysis')">
             <div class="card-body">
-                <i class="fas fa-chart-pie report-icon"></i>
+                <i class="fas fa-chart-pie report-icon" data-bs-toggle="tooltip" title="Category analysis"></i>
                 <h5 class="card-title">Category Analysis</h5>
                 <p class="card-text">Detailed breakdown by spending category</p>
             </div>
@@ -67,7 +67,7 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card report-card text-center" onclick="showReport('spending-trends')">
             <div class="card-body">
-                <i class="fas fa-chart-area report-icon"></i>
+                <i class="fas fa-chart-area report-icon" data-bs-toggle="tooltip" title="Spending trends"></i>
                 <h5 class="card-title">Spending Trends</h5>
                 <p class="card-text">Track spending patterns over time</p>
             </div>
@@ -78,7 +78,7 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card report-card text-center" onclick="showReport('fund-progress')">
             <div class="card-body">
-                <i class="fas fa-piggy-bank report-icon"></i>
+                <i class="fas fa-piggy-bank report-icon" data-bs-toggle="tooltip" title="Fund progress"></i>
                 <h5 class="card-title">Fund Progress</h5>
                 <p class="card-text">Track progress toward savings goals</p>
             </div>
@@ -89,7 +89,7 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card report-card text-center" onclick="showExportOptions()">
             <div class="card-body">
-                <i class="fas fa-download report-icon"></i>
+                <i class="fas fa-download report-icon" data-bs-toggle="tooltip" title="Export options"></i>
                 <h5 class="card-title">Export Data</h5>
                 <p class="card-text">Download your data in various formats</p>
             </div>
@@ -117,10 +117,10 @@
                 <p>Select the format for your data export:</p>
                 <div class="d-grid gap-2">
                     <button class="btn btn-outline-primary" onclick="exportData('csv')">
-                        <i class="fas fa-file-csv"></i> Export as CSV
+                        <i class="fas fa-file-csv" data-bs-toggle="tooltip" title="Export as CSV"></i> Export as CSV
                     </button>
                     <button class="btn btn-outline-primary" onclick="exportData('json')">
-                        <i class="fas fa-file-code"></i> Export as JSON
+                        <i class="fas fa-file-code" data-bs-toggle="tooltip" title="Export as JSON"></i> Export as JSON
                     </button>
                 </div>
             </div>

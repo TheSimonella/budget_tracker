@@ -109,7 +109,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">Transactions</h4>
     <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
-        <i class="fas fa-plus me-1"></i> Add Transaction
+        <i class="fas fa-plus me-1" data-bs-toggle="tooltip" title="Add a new transaction"></i> Add Transaction
     </button>
 </div>
 
@@ -470,10 +470,10 @@
                         <td class="${amountClass} text-end">${amountSign}${formatCurrency(trans.amount)}</td>
                         <td>
                             <div class="action-buttons text-end">
-                                <button class="btn btn-sm btn-link text-primary p-1" onclick="editTransaction(${trans.id})">
+                                <button class="btn btn-sm btn-link text-primary p-1" onclick="editTransaction(${trans.id})" title="Edit transaction" data-bs-toggle="tooltip">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-sm btn-link text-danger p-1" onclick="deleteTransaction(${trans.id})">
+                                <button class="btn btn-sm btn-link text-danger p-1" onclick="deleteTransaction(${trans.id})" title="Delete transaction" data-bs-toggle="tooltip">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
