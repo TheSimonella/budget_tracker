@@ -109,7 +109,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">Transactions</h4>
     <div>
-        <button class="btn btn-modern-secondary me-2" onclick="connectAccount()" {% if not plaid_enabled %}disabled title="Plaid not configured"{% endif %}>
+        <button class="btn btn-modern-secondary me-2" onclick="connectAccount()" {% if not plaid_enabled %}title="Plaid not configured"{% endif %}>
             <i class="fas fa-university me-1"></i> Connect Account
         </button>
         <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
@@ -598,18 +598,18 @@
     }
 
     function connectAccount() {
-        if (!PLAID_ENABLED) {
-            showToast('Plaid is not configured', 'error');
-            return;
-        }
         const w = 600, h = 650;
         const left = (screen.width - w) / 2;
         const top = (screen.height - h) / 2;
         if (PLAID_CREDS_NEEDED) {
             window.open('/plaid/config?next=/plaid/connect', 'plaidConfig', `width=${w},height=${h},left=${left},top=${top}`);
-        } else {
-            window.open('/plaid/connect', 'plaidLink', `width=${w},height=${h},left=${left},top=${top}`);
+            return;
         }
+        if (!PLAID_ENABLED) {
+            showToast('Plaid is not configured', 'error');
+            return;
+        }
+        window.open('/plaid/connect', 'plaidLink', `width=${w},height=${h},left=${left},top=${top}`);
     }
 
     window.addEventListener('message', function(evt) {
