@@ -47,3 +47,263 @@ body {
     overflow-x: auto;
   }
 }
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --success-color: #2a9d8f;
+            --warning-color: #f77f00;
+            --danger-color: #d62828;
+            --dark-color: #2d3748;
+            --light-color: #f7fafc;
+            --gray-100: #f8f9fa;
+            --gray-200: #e9ecef;
+            --gray-300: #dee2e6;
+            --gray-400: #ced4da;
+            --gray-500: #adb5bd;
+            --gray-600: #6c757d;
+            --gray-700: #495057;
+            --gray-800: #343a40;
+            --gray-900: #212529;
+        }
+
+        body {
+            background-color: var(--background-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--text-color);
+        }
+        
+        /* Modern Navbar */
+        .navbar {
+            background: var(--navbar-background-color) !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,.1);
+            padding: 0.5rem 0;
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+            color: var(--text-color) !important;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .navbar-brand i {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .navbar-nav .nav-link {
+            color: var(--text-color) !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem !important;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+        }
+        
+        .navbar-nav .nav-link:hover {
+            background-color: var(--gray-100);
+            color: var(--primary-color) !important;
+        }
+        
+        .navbar-nav .nav-link.active {
+            background: var(--primary-gradient);
+            color: white !important;
+        }
+        
+        /* Main Container */
+        .main-container {
+            padding: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Modern Cards */
+        .modern-card {
+            background: var(--card-background-color);
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.1);
+            margin-bottom: 1.5rem;
+            transition: box-shadow 0.2s;
+        }
+        
+        .modern-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,.15);
+        }
+        
+        .modern-card .card-header {
+            background: none;
+            border-bottom: 1px solid var(--gray-200);
+            padding: 1rem 1.25rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--gray-800);
+        }
+        
+        .modern-card .card-body {
+            padding: 1.25rem;
+        }
+        
+        /* Gradient Header Strip */
+        .gradient-header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 1.5rem 0;
+            margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Modern Buttons */
+        .btn-modern {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s;
+            border: none;
+        }
+        
+        .btn-modern-primary {
+            background: var(--primary-gradient);
+            color: white;
+        }
+        
+        .btn-modern-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+        
+        .btn-modern-secondary {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-200);
+        }
+        
+        .btn-modern-secondary:hover {
+            background: var(--gray-200);
+            color: var(--gray-800);
+        }
+        
+        /* Modern Tables */
+        .modern-table {
+            font-size: 0.875rem;
+        }
+        
+        .modern-table thead {
+            background: var(--gray-50);
+            border-bottom: 2px solid var(--gray-200);
+        }
+        
+        .modern-table th {
+            font-weight: 600;
+            color: var(--text-color);
+            padding: 0.75rem 1rem;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .modern-table td {
+            padding: 0.75rem 1rem;
+            color: var(--text-color);
+            border-bottom: 1px solid var(--gray-100);
+        }
+        
+        /* Progress Bars */
+        .progress {
+            height: 20px;
+            border-radius: 10px;
+            background-color: var(--gray-200);
+        }
+        
+        .progress-bar {
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        /* Modern Input Groups */
+        .modern-input-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .modern-input-group .form-control,
+        .modern-input-group .form-select {
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
+        }
+        
+        .modern-input-group .form-control:focus,
+        .modern-input-group .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        /* Toast Notifications */
+        .toast {
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,.15);
+        }
+        
+        .toast-header {
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 1rem;
+            }
+            
+            .gradient-header {
+                margin: -1rem -1rem 1rem -1rem;
+            }
+            
+            .navbar-nav {
+                margin-top: 1rem;
+            }
+            
+            .navbar-nav .nav-link {
+                margin-bottom: 0.25rem;
+            }
+        }
+        
+        /* Utility Classes */
+        .text-gradient {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hover-scale {
+            transition: transform 0.2s;
+        }
+        
+        .hover-scale:hover {
+            transform: scale(1.02);
+        }
+        
+        /* Loading States */
+        .skeleton {
+            background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-300) 50%, var(--gray-200) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
