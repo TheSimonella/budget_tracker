@@ -82,6 +82,18 @@ The app can export transactions and other data to CSV or JSON via `/api/export/c
 - Delete `budget_tracker.db` to reset data (the database will be recreated on next start).
 - For Windows specific issues run `debug_start.bat` which checks Python versions and logs server output.
 
+## Running tests
+
+Unit tests are written with **pytest**. To run them locally, install the
+dependencies from `requirements.txt` and then execute:
+
+```bash
+pytest
+```
+
+The `test_setup.py` module can also be executed directly to verify that
+required files and packages are available.
+
 ## License
 
 This project is provided as-is under the MIT license.
