@@ -45,7 +45,7 @@
     <div class="col-12">
         <h1 class="mb-4">
             <i class="fas fa-piggy-bank"></i> Savings Funds
-            <button class="btn btn-modern-primary float-end" data-bs-toggle="modal" data-bs-target="#addFundModal">
+            <button class="btn btn-modern-primary float-end" onclick="toggleAddFundForm()">
                 <i class="fas fa-plus"></i> Create Fund
             </button>
         </h1>
@@ -56,43 +56,40 @@
     <!-- Funds will be loaded here -->
 </div>
 
-<!-- Add Fund Modal -->
-<div class="modal fade" id="addFundModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Create New Fund</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="addFundForm">
-                    <div class="mb-3">
-                        <label class="form-label">Fund Name</label>
-                        <input type="text" class="form-control" name="name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Current Balance</label>
-                        <input type="number" class="form-control" name="current_balance" step="0.01" value="0" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Goal Amount</label>
-                        <input type="number" class="form-control" name="goal_amount" step="0.01" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Target Date</label>
-                        <input type="date" class="form-control" name="goal_date" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Monthly Contribution</label>
-                        <input type="number" class="form-control" name="monthly_contribution" step="0.01" value="0">
-                        <small class="form-text text-muted">This will be added to your budget as a monthly expense</small>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-modern-primary" onclick="saveFund()">Create Fund</button>
-            </div>
+<!-- Add Fund Form -->
+<div class="collapse" id="addFundModal">
+    <div class="card mt-3">
+        <div class="card-header">
+            <h5 class="mb-0">Create New Fund</h5>
+        </div>
+        <div class="card-body">
+            <form id="addFundForm">
+                <div class="mb-3">
+                    <label class="form-label">Fund Name</label>
+                    <input type="text" class="form-control" name="name" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Current Balance</label>
+                    <input type="number" class="form-control" name="current_balance" step="0.01" value="0" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Goal Amount</label>
+                    <input type="number" class="form-control" name="goal_amount" step="0.01" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Target Date</label>
+                    <input type="date" class="form-control" name="goal_date" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Monthly Contribution</label>
+                    <input type="number" class="form-control" name="monthly_contribution" step="0.01" value="0">
+                    <small class="form-text text-muted">This will be added to your budget as a monthly expense</small>
+                </div>
+            </form>
+        </div>
+        <div class="card-footer text-end">
+            <button type="button" class="btn btn-secondary" onclick="toggleAddFundForm(false)">Cancel</button>
+            <button type="button" class="btn btn-modern-primary" onclick="saveFund()">Create Fund</button>
         </div>
     </div>
 </div>
@@ -246,6 +243,14 @@
         
         return months > 0 ? months : 0;
     }
+
+    function toggleAddFundForm(show) {
+        const el = document.getElementById('addFundModal');
+        const collapse = bootstrap.Collapse.getOrCreateInstance(el);
+        if (show === true) collapse.show();
+        else if (show === false) collapse.hide();
+        else collapse.toggle();
+    }
     
     function saveFund() {
         const formData = $('#addFundForm').serializeArray();
@@ -260,7 +265,7 @@
             contentType: 'application/json',
             data: JSON.stringify(data),
             success: function() {
-                $('#addFundModal').modal('hide');
+                toggleAddFundForm(false);
                 $('#addFundForm')[0].reset();
                 showToast('Fund created successfully! Check your budget to see the monthly contribution.', 'success');
                 loadFunds();
