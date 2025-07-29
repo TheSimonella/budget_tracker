@@ -91,8 +91,10 @@ dependencies from `requirements.txt` and then execute:
 pytest
 ```
 
-The `test_setup.py` module can also be executed directly to verify that
-required files and packages are available.
+The `test_setup.py` module can also be executed directly with
+`python test_setup.py` to verify that required files and packages are
+available. When running checks from another script or test suite, call
+`test_setup.run_checks(interactive=False)` to skip the final input prompt.
 
 ## License
 
