@@ -96,6 +96,10 @@ The `test_setup.py` module can also be executed directly with
 available. When running checks from another script or test suite, call
 `test_setup.run_checks(interactive=False)` to skip the final input prompt.
 
+Continuous integration is configured with **GitHub Actions**. Every push or pull
+request triggers the workflow in `.github/workflows/python-tests.yml` which
+installs dependencies and runs `pytest` automatically.
+
 ## License
 
 This project is provided as-is under the MIT license.
