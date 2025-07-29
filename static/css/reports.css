@@ -1,0 +1,15 @@
+    .report-card {
+        height: 100%;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    
+    .report-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .report-icon {
+        font-size: 3rem;
+        color: var(--primary-color);
+        margin-bottom: 15px;
+    }
