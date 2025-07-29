@@ -1,0 +1,137 @@
+    /* Dashboard Specific Styles */
+    .summary-item {
+        text-align: center;
+        border-right: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 0.5rem 0;
+    }
+    
+    .summary-item:last-child {
+        border-right: none;
+    }
+    
+    .summary-label {
+        font-size: 0.75rem;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .summary-value {
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin: 0.25rem 0;
+    }
+    
+    .summary-subtext {
+        font-size: 0.7rem;
+        opacity: 0.8;
+    }
+    
+    /* Gradient Summary Strip */
+    .summary-strip {
+        background: var(--primary-gradient);
+        color: white;
+        padding: 1.5rem 0;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Sankey Diagram */
+    #sankeyDiagram {
+        width: 100%;
+        height: 350px;
+    }
+    
+    /* Expandable Content */
+    .expandable-content {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    /* Transaction Items */
+    .transaction-item {
+        padding: 0.75rem 1rem;
+        font-size: 0.813rem;
+        border-bottom: 1px solid var(--gray-100);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background-color 0.2s;
+    }
+    
+    .transaction-item:hover {
+        background-color: var(--gray-50);
+    }
+    
+    .transaction-item:last-child {
+        border-bottom: none;
+    }
+    
+    .transaction-details {
+        flex: 1;
+    }
+    
+    .transaction-amount {
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    /* Fund Items */
+    .fund-item {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--gray-100);
+    }
+    
+    .fund-item:last-child {
+        border-bottom: none;
+    }
+    
+    .fund-name {
+        font-size: 0.813rem;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+    
+    .fund-amount {
+        font-size: 0.75rem;
+        color: var(--gray-600);
+    }
+    
+    /* Progress Colors - Positive Progression */
+    .progress-positive-0 {
+        background-color: #e0e7ff;
+        color: #3730a3;
+    }
+    
+    .progress-positive-25 {
+        background-color: #c7d2fe;
+        color: #4c1d95;
+    }
+    
+    .progress-positive-50 {
+        background-color: #a5b4fc;
+        color: #4c1d95;
+    }
+    
+    .progress-positive-75 {
+        background-color: #818cf8;
+        color: white;
+    }
+    
+    .progress-positive-100 {
+        background-color: #22c55e;
+        color: white;
+    }
+    
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .summary-item {
+            border-right: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .summary-value {
+            font-size: 1.5rem;
+        }
+    }
