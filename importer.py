@@ -68,6 +68,8 @@ def parse_csv(file_obj, column_map=None):
     else:
         fh = TextIOWrapper(file_obj, encoding="utf-8-sig")
     reader = csv.DictReader(fh)
+    if reader.fieldnames is None:
+        raise ValueError("CSV file is missing a header row")
     header_map = _detect_headers(reader.fieldnames, column_map)
 
     transactions = []

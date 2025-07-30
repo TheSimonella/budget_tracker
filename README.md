@@ -76,7 +76,7 @@ If database changes are required, the helper function `migrate_database()` in `a
 ## Export / import
 
 The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`. An Excel import endpoint exists (`/api/import-excel`) as a placeholder – adapt the implementation to match your spreadsheet format if needed.
-CSV files can be uploaded using `/api/import-csv`. The parser attempts to detect column headers automatically and will return any unresolved rows that require manual correction.
+CSV files can be uploaded using `/api/import-csv`. The parser attempts to detect column headers automatically and will return any unresolved rows that require manual correction. When uploading from the Transactions page a small progress bar indicates the upload status.
 
 ## Troubleshooting
 

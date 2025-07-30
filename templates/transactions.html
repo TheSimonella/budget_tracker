@@ -12,6 +12,9 @@
     <h4 class="mb-0">Transactions</h4>
     <div class="d-flex align-items-center">
         <input type="file" id="csvFile" accept=".csv" class="form-control form-control-sm me-2">
+        <div class="progress me-2" style="width: 150px; display: none;" id="csvProgress">
+            <div class="progress-bar" role="progressbar" style="width: 0%;" id="csvProgressBar"></div>
+        </div>
         <button class="btn btn-modern-secondary me-2" onclick="importCsv()">Import CSV</button>
         <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
             <i class="fas fa-plus me-1"></i> Add Transaction

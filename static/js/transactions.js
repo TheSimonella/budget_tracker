@@ -290,12 +290,27 @@
         const formData = new FormData();
         formData.append('file', input.files[0]);
 
+        const progressWrap = document.getElementById('csvProgress');
+        const progressBar = document.getElementById('csvProgressBar');
+        progressWrap.style.display = 'block';
+        progressBar.style.width = '0%';
+
         $.ajax({
             url: '/api/import-csv',
             method: 'POST',
             data: formData,
             processData: false,
             contentType: false,
+            xhr: function() {
+                const xhr = new window.XMLHttpRequest();
+                xhr.upload.addEventListener('progress', function(evt) {
+                    if (evt.lengthComputable) {
+                        const percent = (evt.loaded / evt.total) * 100;
+                        progressBar.style.width = percent + '%';
+                    }
+                });
+                return xhr;
+            },
             success: function(res) {
                 loadTransactions();
                 if (res.unresolved && res.unresolved.length) {
@@ -304,10 +319,12 @@
                 }
                 showToast(res.imported + ' transactions imported');
                 input.value = '';
+                progressWrap.style.display = 'none';
             },
             error: function(xhr) {
                 const error = xhr.responseJSON?.error || 'Import failed';
                 showToast('Error: ' + error, 'error');
+                progressWrap.style.display = 'none';
             }
         });
     }

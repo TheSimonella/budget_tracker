@@ -1372,6 +1372,8 @@ def import_csv_route():
         return jsonify({'imported': len(transactions), 'unresolved': unresolved})
     except Exception as e:
         db.session.rollback()
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
