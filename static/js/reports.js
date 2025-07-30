@@ -1,7 +1,23 @@
-    let annualChart = null;
-    let categoryChart = null;
+    // Track all active Chart.js instances so we can destroy them
+    let activeCharts = [];
+
+    function destroyCharts() {
+        if (activeCharts.length) {
+            activeCharts.forEach(c => {
+                try {
+                    c.destroy();
+                } catch (e) {
+                    console.error('Error destroying chart', e);
+                }
+            });
+            activeCharts = [];
+        }
+    }
 
     function showReport(reportType) {
+        // Clean up any previous charts before rendering a new report
+        destroyCharts();
+
         $('#reportDisplay').show();
         $('#reportContent').html('<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>Loading report...</p></div>');
         
@@ -111,6 +127,7 @@
     }
     
     function loadAnnualOverview() {
+        destroyCharts();
         const currentYear = new Date().getFullYear();
         $.get(`/api/reports/annual-overview/${currentYear}`, function(data) {
             let monthlyTrendHtml = '<h5>Monthly Trends</h5><canvas id="monthlyTrendChart" width="400" height="200"></canvas>';
@@ -152,10 +169,7 @@
             
             // Create the trend chart
             const ctx = document.getElementById('monthlyTrendChart').getContext('2d');
-            if (annualChart) {
-                annualChart.destroy();
-            }
-            annualChart = new Chart(ctx, {
+            const chart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: data.months,
@@ -194,12 +208,14 @@
                     }
                 }
             });
+            activeCharts.push(chart);
         }).fail(function() {
             $('#reportContent').html('<div class="alert alert-warning">No data available for the current year.</div>');
         });
     }
     
     function loadCategoryAnalysis() {
+        destroyCharts();
         const currentMonth = new Date().toISOString().slice(0, 7);
         $.get(`/api/reports/category-analysis/${currentMonth}`, function(data) {
             let chartHtml = `
@@ -248,10 +264,7 @@
             
             // Create pie chart
             const ctx = document.getElementById('categoryPieChart').getContext('2d');
-            if (categoryChart) {
-                categoryChart.destroy();
-            }
-            categoryChart = new Chart(ctx, {
+            const chart = new Chart(ctx, {
                 type: 'pie',
                 data: {
                     labels: data.categories.map(c => c.name),
@@ -280,10 +293,12 @@
                     }
                 }
             });
+            activeCharts.push(chart);
         });
     }
     
     function loadSpendingTrends() {
+        destroyCharts();
         $.get('/api/reports/spending-trends', function(data) {
             let chartHtml = `
                 <h3>Spending Trends - Last 6 Months</h3>
@@ -324,7 +339,7 @@
             
             // Create trend chart
             const ctx = document.getElementById('spendingTrendChart').getContext('2d');
-            new Chart(ctx, {
+            const chart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: data.months,
@@ -351,6 +366,7 @@
                     }
                 }
             });
+            activeCharts.push(chart);
         });
     }
     
