@@ -1,3 +1,6 @@
+    let annualChart = null;
+    let categoryChart = null;
+
     function showReport(reportType) {
         $('#reportDisplay').show();
         $('#reportContent').html('<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>Loading report...</p></div>');
@@ -149,7 +152,10 @@
             
             // Create the trend chart
             const ctx = document.getElementById('monthlyTrendChart').getContext('2d');
-            new Chart(ctx, {
+            if (annualChart) {
+                annualChart.destroy();
+            }
+            annualChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: data.months,
@@ -242,7 +248,10 @@
             
             // Create pie chart
             const ctx = document.getElementById('categoryPieChart').getContext('2d');
-            new Chart(ctx, {
+            if (categoryChart) {
+                categoryChart.destroy();
+            }
+            categoryChart = new Chart(ctx, {
                 type: 'pie',
                 data: {
                     labels: data.categories.map(c => c.name),
