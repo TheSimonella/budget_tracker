@@ -279,3 +279,35 @@
             });
         }
     }
+
+    function importCsv() {
+        const input = document.getElementById('csvFile');
+        if (!input.files.length) {
+            showToast('Please choose a CSV file.', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+
+        $.ajax({
+            url: '/api/import-csv',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                loadTransactions();
+                if (res.unresolved && res.unresolved.length) {
+                    alert(res.unresolved.length + ' rows could not be imported');
+                    console.log('Unresolved rows:', res.unresolved);
+                }
+                showToast(res.imported + ' transactions imported');
+                input.value = '';
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Import failed';
+                showToast('Error: ' + error, 'error');
+            }
+        });
+    }

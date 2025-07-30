@@ -1,3 +1,4 @@
+import io
 import pytest
 from app import app, db, init_database
 
@@ -70,4 +71,36 @@ def test_detect_subscriptions(client):
     resp = client.get('/api/subscriptions')
     subs = resp.get_json()
     assert any('netflix' in s['merchant'] for s in subs)
+
+
+def test_import_csv(client):
+    csv_data = (
+        "Transaction Date,Amount,Description,Merchant,Category,Type\n"
+        "2023-01-01,10.00,Groceries order,Amazon,Groceries,expense\n"
+    )
+    data = {'file': (io.BytesIO(csv_data.encode('utf-8')), 'test.csv')}
+    resp = client.post('/api/import-csv', data=data, content_type='multipart/form-data')
+    assert resp.status_code == 200
+    out = resp.get_json()
+    assert out['imported'] == 1
+    assert out['unresolved'] == []
+
+    resp = client.get('/api/transactions')
+    assert len(resp.get_json()) == 1
+
+
+def test_import_csv_header_aliases(client):
+    csv_data = (
+        "posted date,debit,memo,payee,classification\n"
+        "2023-01-02,5.00,Gas fill,Shell,Gas\n"
+    )
+    data = {'file': (io.BytesIO(csv_data.encode('utf-8')), 'test2.csv')}
+    resp = client.post('/api/import-csv', data=data, content_type='multipart/form-data')
+    assert resp.status_code == 200
+    out = resp.get_json()
+    assert out['imported'] == 1
+    assert not out['unresolved']
+
+    resp = client.get('/api/transactions')
+    assert len(resp.get_json()) == 1
 

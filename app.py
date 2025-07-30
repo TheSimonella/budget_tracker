@@ -1352,6 +1352,29 @@ def export_json():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/import-csv', methods=['POST'])
+def import_csv_route():
+    """Import transactions from an uploaded CSV file."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    try:
+        from importer import parse_csv
+
+        transactions, unresolved = parse_csv(file)
+        for tx in transactions:
+            db.session.add(tx)
+        db.session.commit()
+        return jsonify({'imported': len(transactions), 'unresolved': unresolved})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/import-excel', methods=['POST'])
 def import_excel():
     if 'file' not in request.files:
