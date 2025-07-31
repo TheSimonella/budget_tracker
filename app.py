@@ -1380,6 +1380,54 @@ def import_excel():
     
     return jsonify({'error': 'Invalid file format'}), 400
 
+
+@app.route('/api/import-csv', methods=['POST'])
+def import_csv():
+    """Import bank transactions from a CSV file."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    bank = request.form.get('bank', 'bank1')
+
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'Invalid file format'}), 400
+
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+
+    from transaction_importer import parse_csv
+
+    try:
+        records = parse_csv(filepath, bank)
+        count = 0
+        for rec in records:
+            cat = Category.query.filter_by(name=rec['category_name']).first()
+            if not cat:
+                cat = Category.query.filter_by(name='Uncategorized').first()
+            tx = Transaction(
+                amount=rec['amount'],
+                transaction_type=rec['transaction_type'],
+                category_id=cat.id,
+                description=rec['description'],
+                merchant=rec['merchant'],
+                date=rec['date']
+            )
+            db.session.add(tx)
+            count += 1
+        db.session.commit()
+        return jsonify({'message': f'{count} transactions imported successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
 ####
 # API: Subscriptions
 ####
@@ -1435,6 +1483,7 @@ def init_database():
             Category(name='Utilities', type='expense', parent_category='Housing', default_budget=0, is_custom=False),
             Category(name='Internet', type='expense', parent_category='Housing', default_budget=0, is_custom=False),
             Category(name='Phone', type='expense', parent_category='Personal', default_budget=0, is_custom=False),
+            Category(name='Uncategorized', type='expense', parent_category='Misc', default_budget=0, is_custom=False),
         ]
         
         for category in default_categories:

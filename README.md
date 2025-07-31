@@ -75,7 +75,12 @@ If database changes are required, the helper function `migrate_database()` in `a
 
 ## Export / import
 
-The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`. An Excel import endpoint exists (`/api/import-excel`) as a placeholder – adapt the implementation to match your spreadsheet format if needed.
+The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`.
+Transactions from your bank can be imported using `/api/import-csv`.  Send a
+CSV file using `multipart/form-data` and specify the `bank` form field to select
+the parser (`bank1` or `bank2`).  Parsed rows will be stored as transactions and
+assigned a category based on simple keyword matching.  Unknown merchants default
+to the `Uncategorized` category.
 
 ## Troubleshooting
 
@@ -85,4 +90,5 @@ The app can export transactions and other data to CSV or JSON via `/api/export/c
 
 ## License
 
-This project is provided as-is under the MIT license.
+This project is provided as-is under the MIT license. See the `LICENSE` file
+for the full text.

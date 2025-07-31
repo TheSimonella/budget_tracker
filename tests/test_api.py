@@ -1,11 +1,12 @@
 import pytest
-from app import app, db, init_database
+from app import app, db, init_database, Transaction
 
 @pytest.fixture
 def client(tmp_path):
     app.config['TESTING'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + str(tmp_path / 'test.db')
     with app.app_context():
+        db.drop_all()
         db.create_all()
         init_database()
         yield app.test_client()
@@ -70,4 +71,25 @@ def test_detect_subscriptions(client):
     resp = client.get('/api/subscriptions')
     subs = resp.get_json()
     assert any('netflix' in s['merchant'] for s in subs)
+
+
+def test_import_csv(client, tmp_path):
+    csv_content = """Date,Description,Amount
+2023-01-01,Store A,-10.00
+2023-01-02,Employer,100.00
+"""
+    csv_file = tmp_path / 'data.csv'
+    csv_file.write_text(csv_content)
+
+    data = {
+        'file': (open(csv_file, 'rb'), 'data.csv'),
+        'bank': 'bank1'
+    }
+
+    resp = client.post('/api/import-csv', data=data, content_type='multipart/form-data')
+    assert resp.status_code == 200
+
+    with app.app_context():
+        count = Transaction.query.count()
+        assert count == 2
 
