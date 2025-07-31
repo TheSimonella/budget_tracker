@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import os, json, calendar, csv, io
 from werkzeug.utils import secure_filename
 from sqlalchemy import extract, func, or_
+from transaction_parser import parse_transactions
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///budget_tracker.db'
@@ -92,6 +93,15 @@ def validate_date(date_str):
         return date_obj, None
     except ValueError:
         return None, "Invalid date format"
+
+def get_or_create_category(name, typ):
+    """Fetch category by name or create it if missing"""
+    cat = Category.query.filter_by(name=name, type=typ).first()
+    if not cat:
+        cat = Category(name=name, type=typ, is_custom=True)
+        db.session.add(cat)
+        db.session.commit()
+    return cat
 
 def calculate_recommended_contribution(fund):
     """Calculate recommended monthly contribution for a fund"""
@@ -1351,6 +1361,55 @@ def export_json():
         )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/import-csv', methods=['POST'])
+def import_csv():
+    """Import transactions from a CSV file for a given bank"""
+    if 'file' not in request.files or 'bank' not in request.form:
+        return jsonify({'error': 'CSV file and bank type required'}), 400
+
+    file = request.files['file']
+    bank = request.form['bank']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'Invalid file format'}), 400
+
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+
+    try:
+        transactions = parse_transactions(filepath, bank)
+        imported = 0
+        for tx in transactions:
+            amount = float(tx['amount'])
+            tx_type = 'income' if amount >= 0 else 'expense'
+            amount = abs(amount)
+            cat_name = 'Imported Income' if tx_type == 'income' else 'Imported Expense'
+            category = get_or_create_category(cat_name, tx_type)
+            date_obj, err = validate_date(str(tx['date']))
+            if err:
+                continue
+            new_tx = Transaction(
+                amount=amount,
+                transaction_type=tx_type,
+                category_id=category.id,
+                description=tx.get('description', ''),
+                merchant=tx.get('merchant', ''),
+                date=date_obj,
+            )
+            db.session.add(new_tx)
+            imported += 1
+        db.session.commit()
+        return jsonify({'message': f"Imported {imported} transactions"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
 @app.route('/api/import-excel', methods=['POST'])
 def import_excel():

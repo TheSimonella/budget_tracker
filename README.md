@@ -75,7 +75,13 @@ If database changes are required, the helper function `migrate_database()` in `a
 
 ## Export / import
 
-The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`. An Excel import endpoint exists (`/api/import-excel`) as a placeholder – adapt the implementation to match your spreadsheet format if needed.
+The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`.
+Transactions can be imported from CSV using `/api/import-csv`. Specify the bank
+type via a form field `bank` (e.g. `banka` or `bankb`). The parser normalizes
+different column layouts and stores transactions under generic categories
+`Imported Income` or `Imported Expense`. An Excel import endpoint exists
+(`/api/import-excel`) as a placeholder – adapt the implementation to match your
+spreadsheet format if needed.
 
 ## Troubleshooting
 
@@ -85,4 +91,4 @@ The app can export transactions and other data to CSV or JSON via `/api/export/c
 
 ## License
 
-This project is provided as-is under the MIT license.
+This project is provided as-is under the MIT license. See `LICENSE` for details.
