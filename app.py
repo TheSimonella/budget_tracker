@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import os, json, calendar, csv, io
 from werkzeug.utils import secure_filename
 from sqlalchemy import extract, func, or_
+from transaction_parser import parse_csv
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///budget_tracker.db'
@@ -1379,6 +1380,50 @@ def import_excel():
                 os.remove(filepath)
     
     return jsonify({'error': 'Invalid file format'}), 400
+
+
+@app.route('/api/import-csv', methods=['POST'])
+def import_csv():
+    """Import transactions from a CSV file produced by a supported bank."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+
+    try:
+        txs = parse_csv(filepath)
+
+        # ensure uncategorized category exists
+        uncategorized = Category.query.filter_by(name='Uncategorized').first()
+        if not uncategorized:
+            uncategorized = Category(name='Uncategorized', type='expense', parent_category='Uncategorized')
+            db.session.add(uncategorized)
+            db.session.commit()
+
+        for tx in txs:
+            new_tx = Transaction(
+                amount=tx['amount'],
+                transaction_type=tx['transaction_type'],
+                category_id=uncategorized.id,
+                description=tx['description'],
+                merchant=tx['merchant'],
+                date=tx['date']
+            )
+            db.session.add(new_tx)
+        db.session.commit()
+        return jsonify({'imported': len(txs)})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
 ####
 # API: Subscriptions

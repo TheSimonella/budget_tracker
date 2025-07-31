@@ -75,7 +75,9 @@ If database changes are required, the helper function `migrate_database()` in `a
 
 ## Export / import
 
-The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`. An Excel import endpoint exists (`/api/import-excel`) as a placeholder – adapt the implementation to match your spreadsheet format if needed.
+The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`.
+Transactions from supported banks can be imported with `/api/import-csv` by uploading a CSV file.
+An Excel import endpoint exists (`/api/import-excel`) as a placeholder – adapt it to match your spreadsheet format if needed.
 
 ## Troubleshooting
 
