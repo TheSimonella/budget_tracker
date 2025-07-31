@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import os, json, calendar, csv, io
 from werkzeug.utils import secure_filename
 from sqlalchemy import extract, func, or_
+from transaction_parser import parse_csv as parse_csv_transactions
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///budget_tracker.db'
@@ -1406,6 +1407,47 @@ def detect_subscriptions_endpoint():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/import-csv', methods=['POST'])
+def import_csv_route():
+    """Import transactions from a CSV file uploaded via form data."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    bank = request.form.get('bank', 'bank1')
+
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if file and file.filename.endswith('.csv'):
+        try:
+            transactions = parse_csv_transactions(file, bank)
+            count = 0
+            for tx in transactions:
+                category = Category.query.filter_by(name='Groceries').first()
+                if not category:
+                    category = Category(name='Groceries', type='expense')
+                    db.session.add(category)
+                    db.session.flush()
+                new_tx = Transaction(
+                    amount=tx['amount'],
+                    transaction_type=tx['transaction_type'],
+                    category_id=category.id,
+                    description=tx['description'],
+                    merchant=tx['merchant'],
+                    date=tx['date'],
+                )
+                db.session.add(new_tx)
+                count += 1
+            db.session.commit()
+            return jsonify({'message': f'{count} transactions imported'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
+
+    return jsonify({'error': 'Invalid file format'}), 400
 
 
 @app.route('/api/subscriptions/notify', methods=['POST'])

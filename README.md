@@ -10,7 +10,7 @@ A personal budgeting application built with **Flask** and **SQLite**. It lets yo
 - Monthly budget setup per category with comparison against actual spending
 - Savings funds with progress tracking and recommended contributions
 - Report pages (monthly summary, annual overview, category analysis, spending trends)
-- CSV and JSON export of all data and placeholder support for Excel import
+- CSV and JSON export of all data and CSV import for bank transactions
 - REST style API endpoints used by the front end (can also be reused by other tools)
 - Automatic detection of recurring subscriptions with optional renewal notifications
 
@@ -75,7 +75,7 @@ If database changes are required, the helper function `migrate_database()` in `a
 
 ## Export / import
 
-The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`. An Excel import endpoint exists (`/api/import-excel`) as a placeholder – adapt the implementation to match your spreadsheet format if needed.
+The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`. Transactions from your bank can be imported using `/api/import-csv` by uploading a CSV file and specifying the `bank` parameter (e.g. `bank1` or `bank2`). The legacy Excel import endpoint remains as a placeholder for custom spreadsheets.
 
 ## Troubleshooting
 
@@ -85,4 +85,4 @@ The app can export transactions and other data to CSV or JSON via `/api/export/c
 
 ## License
 
-This project is provided as-is under the MIT license.
+This project is provided under the MIT license. See the `LICENSE` file for details.

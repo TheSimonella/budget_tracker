@@ -4,8 +4,9 @@ from app import app, db, init_database
 @pytest.fixture
 def client(tmp_path):
     app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + str(tmp_path / 'test.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     with app.app_context():
+        db.drop_all()
         db.create_all()
         init_database()
         yield app.test_client()
