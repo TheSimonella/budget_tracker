@@ -1,4 +1,4 @@
-import pandas as pd
+import csv
 from csv_importer import import_csv, categorize_merchant
 
 
@@ -8,11 +8,13 @@ def test_import_csv(tmp_path):
         ['Branch Cash Withdrawal 07/02 13:00:00 POS SHELL 456 TX', -20.5],
     ]
     file = tmp_path / "tx.csv"
-    pd.DataFrame(data).to_csv(file, index=False, header=False)
+    with file.open('w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerows(data)
 
-    df = import_csv(file)
-    assert len(df) == 2
-    assert set(df['category_guess']) == {'Groceries', 'Gas'}
+    rows = import_csv(str(file))
+    assert len(rows) == 2
+    assert set(r['category_guess'] for r in rows) == {'Groceries', 'Gas'}
 
 
 def test_categorize_unknown():

@@ -2,8 +2,11 @@ from flask import Flask, render_template, request, jsonify, send_file, Response
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 import os, json, calendar, csv, io
-import pandas as pd
 from werkzeug.utils import secure_filename
+import werkzeug
+
+if not getattr(werkzeug, "__version__", None):
+    werkzeug.__version__ = "3"
 from sqlalchemy import extract, func, or_
 from csv_importer import import_csv
 
@@ -1401,10 +1404,10 @@ def import_csv_route():
     file.save(filepath)
 
     try:
-        df = import_csv(filepath)
+        rows = import_csv(filepath)
         created = 0
-        for _, row in df.iterrows():
-            if pd.isna(row['date']):
+        for row in rows:
+            if not row.get('date'):
                 continue
             cat = Category.query.filter_by(name=row['category_guess']).first()
             if not cat:
