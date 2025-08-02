@@ -92,14 +92,16 @@ def parse_description(raw: str) -> Dict[str, Optional[str]]:
 
 
 def _skip_leading_empty(f, limit: int = 10) -> None:
-    """Advance file iterator to first non-empty line within ``limit`` rows.
+    """Advance file iterator to the first potential header line.
 
-    A line is considered empty if it contains only whitespace, commas, or
-    quotation marks.  This helps ignore CSV files that start with several blank
-    rows (common in some bank exports) before the actual header appears.
+    Many bank CSV exports start with a few blank or informational lines before
+    the actual header row.  This helper scans the first ``limit`` lines and
+    positions the file handle at the first line that appears to contain delimited
+    data (at least one comma/semicolon/tab).
     """
 
     start = f.tell()
+    delimiters = ",;\t"
     for _ in range(limit):
         pos = f.tell()
         line = f.readline()
@@ -109,6 +111,8 @@ def _skip_leading_empty(f, limit: int = 10) -> None:
         if not stripped:
             continue
         if all(ch in ',"' for ch in stripped):
+            continue
+        if not any(d in line for d in delimiters):
             continue
         f.seek(pos)
         return
@@ -135,17 +139,23 @@ def import_csv(path: str) -> Tuple[List[Dict[str, Optional[str]]], Set[str]]:
     unknown_merchants: Set[str] = set()
     with open(path, newline='') as f:
         _skip_leading_empty(f)
-        reader = csv.DictReader(f)
+        start_pos = f.tell()
+        sample = f.read(2048)
+        f.seek(start_pos)
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+        except csv.Error:
+            dialect = csv.excel
+        reader = csv.DictReader(f, dialect=dialect)
         header_missing = False
-        if reader.fieldnames:
+        if reader.fieldnames and len(reader.fieldnames) > 1:
             try:
-                # if second fieldname parses as number, it's likely data not header
                 float(reader.fieldnames[1].replace('$', '').replace(',', ''))
                 header_missing = True
             except Exception:
                 header_missing = False
-        if header_missing:
-            f.seek(0)
+        if header_missing or not reader.fieldnames or len(reader.fieldnames) < 2:
+            f.seek(start_pos)
             reader = None
         if reader and reader.fieldnames:
             lower_fields = [h.lower().strip() for h in reader.fieldnames]
@@ -211,8 +221,8 @@ def import_csv(path: str) -> Tuple[List[Dict[str, Optional[str]]], Set[str]]:
                 })
         else:
             # No header; fall back to simple reader
-            f.seek(0)
-            reader2 = csv.reader(f)
+            f.seek(start_pos)
+            reader2 = csv.reader(f, dialect=dialect)
             for row in reader2:
                 if not row or all(not c.strip() for c in row):
                     continue

@@ -41,3 +41,23 @@ def test_header_and_unknown(tmp_path):
 
 def test_categorize_unknown():
     assert categorize_merchant('Random Store') is None
+
+
+def test_semicolon_with_blanks(tmp_path):
+    lines = [
+        '',
+        '',
+        'Date;Description;Amount',
+        '07/01/2025;Branch Cash Withdrawal 07/01 12:00:00 POS WALMART 123 GA;-10.00',
+        '07/02/2025;Branch Cash Withdrawal 07/02 13:00:00 POS SHELL 456 TX;-20.50',
+    ]
+    file = tmp_path / 'semi.csv'
+    with file.open('w', newline='') as f:
+        for line in lines:
+            f.write(line + '\n')
+
+    rows, unknown = import_csv(str(file))
+    assert len(rows) == 2
+    amts = {r['amount'] for r in rows}
+    assert -10.0 in amts and -20.5 in amts
+    assert not unknown
