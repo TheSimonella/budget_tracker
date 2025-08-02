@@ -1,4 +1,5 @@
 import os
+import csv
 import pytest
 
 
@@ -77,3 +78,31 @@ def test_add_category_keyword_endpoint(client):
     assert resp.status_code == 200
     from categories import categorize_merchant
     assert categorize_merchant('Spent at MyCafe') == 'Coffee'
+
+
+def test_import_csv_endpoint_handles_year_and_blanks(client, tmp_path):
+    data = [
+        ['', '', ''],
+        ['', '', ''],
+        ['Post Date', 'Description', 'Amount'],
+        ['07/01/2025', 'Starbucks', '-5.00'],
+    ]
+    file_path = tmp_path / 'tx.csv'
+    with file_path.open('w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerows(data)
+
+    from app import Transaction
+    with client.application.app_context():
+        before = Transaction.query.count()
+
+    with file_path.open('rb') as f:
+        resp = client.post('/api/import-csv', data={'file': (f, 'tx.csv')}, content_type='multipart/form-data')
+    assert resp.status_code == 200
+
+    from datetime import date as date_cls
+    with client.application.app_context():
+        after = Transaction.query.count()
+        assert after == before + 1
+        tx = Transaction.query.order_by(Transaction.id.desc()).first()
+        assert tx.date == date_cls(2025, 7, 1)

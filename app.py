@@ -1415,7 +1415,19 @@ def import_csv_route():
                 cat = Category(name=row['category_guess'], type='expense')
                 db.session.add(cat)
                 db.session.commit()
-            date_obj = datetime.strptime(str(row['date']), '%m/%d').replace(year=datetime.now().year).date()
+            date_str = str(row['date']).strip()
+            date_obj = None
+            for fmt in ('%m/%d/%Y', '%m/%d/%y', '%m/%d'):
+                try:
+                    dt = datetime.strptime(date_str, fmt)
+                    if fmt == '%m/%d':
+                        dt = dt.replace(year=datetime.now().year)
+                    date_obj = dt.date()
+                    break
+                except ValueError:
+                    continue
+            if not date_obj:
+                continue
             tx = Transaction(
                 amount=float(row['amount']),
                 transaction_type='expense' if float(row['amount']) < 0 else 'income',

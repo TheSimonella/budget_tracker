@@ -91,16 +91,30 @@ def parse_description(raw: str) -> Dict[str, Optional[str]]:
     }
 
 
-def _find_first_nonempty_line(f) -> None:
-    """Advance file iterator to first non-empty line."""
-    while True:
+def _skip_leading_empty(f, limit: int = 10) -> None:
+    """Advance file iterator to first non-empty line within ``limit`` rows.
+
+    A line is considered empty if it contains only whitespace, commas, or
+    quotation marks.  This helps ignore CSV files that start with several blank
+    rows (common in some bank exports) before the actual header appears.
+    """
+
+    start = f.tell()
+    for _ in range(limit):
         pos = f.tell()
         line = f.readline()
         if line == "":
-            return
-        if line.strip():
-            f.seek(pos)
-            return
+            break
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if all(ch in ',"' for ch in stripped):
+            continue
+        f.seek(pos)
+        return
+    # If no suitable line found within limit, reset to start so caller can
+    # handle the lack of data gracefully.
+    f.seek(start)
 
 
 DESC_FIELDS = {'description', 'desc', 'payee', 'memo', 'name'}
@@ -120,7 +134,7 @@ def import_csv(path: str) -> Tuple[List[Dict[str, Optional[str]]], Set[str]]:
     results: List[Dict[str, Optional[str]]] = []
     unknown_merchants: Set[str] = set()
     with open(path, newline='') as f:
-        _find_first_nonempty_line(f)
+        _skip_leading_empty(f)
         reader = csv.DictReader(f)
         header_missing = False
         if reader.fieldnames:
