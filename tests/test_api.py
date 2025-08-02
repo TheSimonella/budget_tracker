@@ -70,3 +70,10 @@ def test_detect_subscriptions(client):
     resp = client.get('/api/subscriptions')
     subs = resp.get_json()
     assert any('netflix' in s['merchant'] for s in subs)
+
+
+def test_add_category_keyword_endpoint(client):
+    resp = client.post('/api/category-keywords', json={'keyword': 'MyCafe', 'category': 'Coffee'})
+    assert resp.status_code == 200
+    from categories import categorize_merchant
+    assert categorize_merchant('Spent at MyCafe') == 'Coffee'

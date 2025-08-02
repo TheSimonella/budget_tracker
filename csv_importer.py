@@ -9,32 +9,9 @@ from __future__ import annotations
 
 import csv
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Tuple
 
-# --- simple categorization ---
-CATEGORY_KEYWORDS: Dict[str, str] = {
-    'GROCERY': 'Groceries',
-    'WALMART': 'Groceries',
-    'KROGER': 'Groceries',
-    'SAFEWAY': 'Groceries',
-    'EXXON': 'Gas',
-    'SHELL': 'Gas',
-    'CHEVRON': 'Gas',
-    'RENT': 'Rent/Mortgage',
-    'MORTGAGE': 'Rent/Mortgage',
-    'UTILITIES': 'Utilities',
-    'INTERNET': 'Internet',
-    'COMCAST': 'Internet',
-    'PHONE': 'Phone',
-}
-
-
-def categorize_merchant(merchant: str) -> Optional[str]:
-    upper = merchant.upper()
-    for keyword, category in CATEGORY_KEYWORDS.items():
-        if keyword in upper:
-            return category
-    return None
+from categories import categorize_merchant
 
 
 # --- text parsing helpers (adapted from banking-class repository) ---
@@ -114,22 +91,136 @@ def parse_description(raw: str) -> Dict[str, Optional[str]]:
     }
 
 
-def import_csv(path: str) -> List[Dict[str, Optional[str]]]:
-    """Import CSV of transactions. Expected columns: raw, amount."""
+def _find_first_nonempty_line(f) -> None:
+    """Advance file iterator to first non-empty line."""
+    while True:
+        pos = f.tell()
+        line = f.readline()
+        if line == "":
+            return
+        if line.strip():
+            f.seek(pos)
+            return
+
+
+DESC_FIELDS = {'description', 'desc', 'payee', 'memo', 'name'}
+AMOUNT_FIELDS = {'amount', 'amt', 'transaction amount', 'debit', 'credit'}
+DATE_FIELDS = {
+    'date', 'transaction date', 'post date', 'posted date', 'posting date',
+    'date posted'
+}
+
+
+def import_csv(path: str) -> Tuple[List[Dict[str, Optional[str]]], Set[str]]:
+    """Import CSV of transactions.
+
+    Returns a tuple of (rows, unknown_merchants).
+    """
+
     results: List[Dict[str, Optional[str]]] = []
+    unknown_merchants: Set[str] = set()
     with open(path, newline='') as f:
-        reader = csv.reader(f)
-        for row in reader:
-            if len(row) < 2:
+        _find_first_nonempty_line(f)
+        reader = csv.DictReader(f)
+        header_missing = False
+        if reader.fieldnames:
+            try:
+                # if second fieldname parses as number, it's likely data not header
+                float(reader.fieldnames[1].replace('$', '').replace(',', ''))
+                header_missing = True
+            except Exception:
+                header_missing = False
+        if header_missing:
+            f.seek(0)
+            reader = None
+        if reader and reader.fieldnames:
+            lower_fields = [h.lower().strip() for h in reader.fieldnames]
+            desc_field = None
+            amount_field = None
+            debit_field = None
+            credit_field = None
+            date_field = None
+            for name in reader.fieldnames:
+                lname = name.lower().strip()
+                if not desc_field and lname in DESC_FIELDS:
+                    desc_field = name
+                if not amount_field and lname in AMOUNT_FIELDS:
+                    if lname == 'debit':
+                        debit_field = name
+                    elif lname == 'credit':
+                        credit_field = name
+                    else:
+                        amount_field = name
+                if not date_field and lname in DATE_FIELDS:
+                    date_field = name
+            if not desc_field:
+                desc_field = reader.fieldnames[0]
+            if not amount_field and not (debit_field or credit_field):
+                # fall back to second column if amount fields not found
+                amount_field = reader.fieldnames[1] if len(reader.fieldnames) > 1 else None
+            if amount_field is None and not (debit_field or credit_field):
                 raise ValueError('CSV must have at least two columns')
-            raw, amount = row[0], row[1]
-            parsed = parse_description(raw)
-            merchant = parsed['merchant'] or ''
-            category = categorize_merchant(merchant) or 'Uncategorized'
-            results.append({
-                'date': parsed['date'],
-                'merchant': merchant,
-                'amount': float(amount),
-                'category_guess': category,
-            })
-    return results
+
+            for row in reader:
+                if not any(row.values()):
+                    continue
+                raw = (row.get(desc_field) or '').strip()
+                if debit_field or credit_field:
+                    debit = (row.get(debit_field) or '').strip()
+                    credit = (row.get(credit_field) or '').strip()
+                    amount_str = credit or debit
+                    if debit:
+                        amount_str = '-' + debit.lstrip('-')
+                else:
+                    amount_str = (row.get(amount_field) or '').strip()
+                if not raw or not amount_str:
+                    continue
+                amount_str = amount_str.replace('$', '').replace(',', '')
+                amount_str = amount_str.replace('(', '-').replace(')', '')
+                try:
+                    amount = float(amount_str)
+                except ValueError:
+                    # skip rows where amount is not numeric
+                    continue
+                parsed = parse_description(raw)
+                merchant = parsed['merchant'] or ''
+                category = categorize_merchant(merchant)
+                if not category:
+                    unknown_merchants.add(merchant)
+                    category = 'Uncategorized'
+                date = row.get(date_field) if date_field else parsed['date']
+                results.append({
+                    'date': date,
+                    'merchant': merchant,
+                    'amount': amount,
+                    'category_guess': category,
+                })
+        else:
+            # No header; fall back to simple reader
+            f.seek(0)
+            reader2 = csv.reader(f)
+            for row in reader2:
+                if not row or all(not c.strip() for c in row):
+                    continue
+                if len(row) < 2:
+                    continue
+                raw, amount_str = row[0], row[1]
+                amount_str = amount_str.replace('$', '').replace(',', '')
+                amount_str = amount_str.replace('(', '-').replace(')', '')
+                try:
+                    amount = float(amount_str)
+                except ValueError:
+                    continue
+                parsed = parse_description(raw)
+                merchant = parsed['merchant'] or ''
+                category = categorize_merchant(merchant)
+                if not category:
+                    unknown_merchants.add(merchant)
+                    category = 'Uncategorized'
+                results.append({
+                    'date': parsed['date'],
+                    'merchant': merchant,
+                    'amount': amount,
+                    'category_guess': category,
+                })
+    return results, unknown_merchants

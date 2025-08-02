@@ -9,6 +9,7 @@ if not getattr(werkzeug, "__version__", None):
     werkzeug.__version__ = "3"
 from sqlalchemy import extract, func, or_
 from csv_importer import import_csv
+from categories import add_keyword_category
 
 app = Flask(__name__)
 db_uri = os.environ.get('BUDGET_DB_URI', 'sqlite:///budget_tracker.db')
@@ -1404,7 +1405,7 @@ def import_csv_route():
     file.save(filepath)
 
     try:
-        rows = import_csv(filepath)
+        rows, unknown = import_csv(filepath)
         created = 0
         for row in rows:
             if not row.get('date'):
@@ -1426,13 +1427,24 @@ def import_csv_route():
             db.session.add(tx)
             created += 1
         db.session.commit()
-        return jsonify({'message': f'Imported {created} transactions'}), 200
+        return jsonify({'message': f'Imported {created} transactions', 'unknown_merchants': list(unknown)}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
         if os.path.exists(filepath):
             os.remove(filepath)
+
+
+@app.route('/api/category-keywords', methods=['POST'])
+def add_category_keyword_route():
+    data = request.get_json() or {}
+    keyword = data.get('keyword')
+    category = data.get('category')
+    if not keyword or not category:
+        return jsonify({'error': 'keyword and category required'}), 400
+    add_keyword_category(keyword, category)
+    return jsonify({'message': 'Keyword added'}), 200
 
 ####
 # API: Subscriptions
