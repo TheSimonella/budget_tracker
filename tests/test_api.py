@@ -1,10 +1,12 @@
+import os
 import pytest
-from app import app, db, init_database
+
 
 @pytest.fixture
 def client(tmp_path):
+    os.environ['BUDGET_DB_URI'] = 'sqlite:///' + str(tmp_path / 'test.db')
+    from app import app, db, init_database
     app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + str(tmp_path / 'test.db')
     with app.app_context():
         db.create_all()
         init_database()
@@ -23,7 +25,6 @@ def test_create_and_list_category(client):
 
 
 def test_create_transaction(client):
-    # create a category first
     resp = client.post('/api/categories', json={'name': 'Food2', 'type': 'expense'})
     cat_id = resp.get_json()['id']
 
@@ -37,7 +38,6 @@ def test_create_transaction(client):
     assert resp.status_code == 200
     tx_id = resp.get_json()['id']
 
-    # retrieve transaction
     resp = client.get(f'/api/transactions/{tx_id}')
     assert resp.status_code == 200
     data = resp.get_json()
@@ -70,4 +70,3 @@ def test_detect_subscriptions(client):
     resp = client.get('/api/subscriptions')
     subs = resp.get_json()
     assert any('netflix' in s['merchant'] for s in subs)
-

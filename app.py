@@ -2,18 +2,22 @@ from flask import Flask, render_template, request, jsonify, send_file, Response
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 import os, json, calendar, csv, io
+import pandas as pd
 from werkzeug.utils import secure_filename
 from sqlalchemy import extract, func, or_
+from csv_importer import import_csv
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///budget_tracker.db'
+db_uri = os.environ.get('BUDGET_DB_URI', 'sqlite:///budget_tracker.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-db = SQLAlchemy(app)
+db = SQLAlchemy()
+db.init_app(app)
 
 ####
 # Models
@@ -1377,8 +1381,55 @@ def import_excel():
             # Clean up uploaded file
             if os.path.exists(filepath):
                 os.remove(filepath)
-    
+
     return jsonify({'error': 'Invalid file format'}), 400
+
+@app.route('/api/import-csv', methods=['POST'])
+def import_csv_route():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'Invalid file format'}), 400
+
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+
+    try:
+        df = import_csv(filepath)
+        created = 0
+        for _, row in df.iterrows():
+            if pd.isna(row['date']):
+                continue
+            cat = Category.query.filter_by(name=row['category_guess']).first()
+            if not cat:
+                cat = Category(name=row['category_guess'], type='expense')
+                db.session.add(cat)
+                db.session.commit()
+            date_obj = datetime.strptime(str(row['date']), '%m/%d').replace(year=datetime.now().year).date()
+            tx = Transaction(
+                amount=float(row['amount']),
+                transaction_type='expense' if float(row['amount']) < 0 else 'income',
+                category_id=cat.id,
+                description=row['merchant'],
+                merchant=row['merchant'],
+                date=date_obj
+            )
+            db.session.add(tx)
+            created += 1
+        db.session.commit()
+        return jsonify({'message': f'Imported {created} transactions'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
 ####
 # API: Subscriptions
@@ -1435,6 +1486,7 @@ def init_database():
             Category(name='Utilities', type='expense', parent_category='Housing', default_budget=0, is_custom=False),
             Category(name='Internet', type='expense', parent_category='Housing', default_budget=0, is_custom=False),
             Category(name='Phone', type='expense', parent_category='Personal', default_budget=0, is_custom=False),
+            Category(name='Uncategorized', type='expense', parent_category='Other', default_budget=0, is_custom=False),
         ]
         
         for category in default_categories:
@@ -1483,8 +1535,8 @@ def migrate_database():
                 'Gross Salary', '401k Deduction', 'Health Insurance Deduction',
                 'Federal Tax Deduction', 'State Tax Deduction', 
                 'Social Security Deduction', 'Medicare Deduction',
-                'Rent/Mortgage', 'Groceries', 'Gas', 'Utilities', 
-                'Internet', 'Phone'
+                'Rent/Mortgage', 'Groceries', 'Gas', 'Utilities',
+                'Internet', 'Phone', 'Uncategorized'
             ]
             for name in default_names:
                 cursor.execute("UPDATE category SET is_custom = 0 WHERE name = ?", (name,))
