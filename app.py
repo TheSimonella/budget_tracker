@@ -67,17 +67,6 @@ class Budget(db.Model):
     category = db.relationship('Category')
     amount = db.Column(db.Float, nullable=False)
 
-class Subscription(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    merchant = db.Column(db.String(100), nullable=False)
-    amount = db.Column(db.Float, nullable=False)
-    frequency_days = db.Column(db.Integer, default=30)
-    last_date = db.Column(db.Date, nullable=False)
-    next_renewal = db.Column(db.Date, nullable=False)
-    notify_days_before = db.Column(db.Integer, default=3)
-    email = db.Column(db.String(120))
-    active = db.Column(db.Boolean, default=True)
-
 ####
 # Helper Functions
 ####
@@ -116,52 +105,6 @@ def calculate_recommended_contribution(fund):
     
     remaining_amount = fund.goal - fund.current_balance
     return max(0, remaining_amount / months_remaining)
-
-def detect_subscriptions():
-    """Simple heuristic to identify recurring transactions by merchant and amount."""
-    txs = Transaction.query.filter(Transaction.merchant != None).order_by(Transaction.merchant, Transaction.date).all()
-    groups = {}
-    for t in txs:
-        key = (t.merchant.strip().lower(), round(t.amount, 2))
-        groups.setdefault(key, []).append(t)
-
-    for (merchant, amount), items in groups.items():
-        if len(items) < 2:
-            continue
-        items.sort(key=lambda x: x.date)
-        intervals = [(items[i].date - items[i-1].date).days for i in range(1, len(items))]
-        avg = sum(intervals) / len(intervals)
-        if not intervals:
-            continue
-        if all(abs(iv - avg) <= 3 for iv in intervals) and 27 <= avg <= 31:
-            last_date = items[-1].date
-            next_date = last_date + timedelta(days=round(avg))
-            sub = Subscription.query.filter_by(merchant=merchant, amount=amount).first()
-            if not sub:
-                sub = Subscription(merchant=merchant, amount=amount,
-                                   frequency_days=round(avg), last_date=last_date,
-                                   next_renewal=next_date)
-                db.session.add(sub)
-            else:
-                sub.last_date = last_date
-                sub.frequency_days = round(avg)
-                sub.next_renewal = next_date
-                sub.active = True
-    db.session.commit()
-
-def send_subscription_notifications():
-    """Placeholder notification logic printing upcoming renewals."""
-    today = datetime.now().date()
-    subs = Subscription.query.filter_by(active=True).all()
-    count = 0
-    for sub in subs:
-        notify_date = sub.next_renewal - timedelta(days=sub.notify_days_before or 0)
-        if today >= notify_date:
-            count += 1
-            if sub.email:
-                print(f"Notify {sub.email}: {sub.merchant} renews on {sub.next_renewal}")
-    return count
-
 ####
 # Page routes
 ####
@@ -185,9 +128,6 @@ def funds_view():
 def reports_view():
     return render_template('reports.html')
 
-@app.route('/subscriptions')
-def subscriptions_view():
-    return render_template('subscriptions.html')
 
 ####
 # API: Dashboard
@@ -337,6 +277,62 @@ def delete_category(id):
         return jsonify({'message': 'Category and related records deleted'})
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dashboard-data/annual/<int:year>')
+def get_dashboard_data_annual(year):
+    try:
+        start_date = datetime(year, 1, 1).date()
+        end_date = datetime(year + 1, 1, 1).date()
+
+        transactions = Transaction.query.filter(
+            Transaction.date >= start_date,
+            Transaction.date < end_date
+        ).all()
+
+        gross_income = sum(t.amount for t in transactions
+                           if t.transaction_type == 'income' and 'deduction' not in t.category.name.lower())
+        deductions = sum(t.amount for t in transactions
+                        if t.transaction_type == 'income' and 'deduction' in t.category.name.lower())
+        net_income = gross_income - deductions
+        total_expenses = sum(t.amount for t in transactions if t.transaction_type == 'expense')
+        total_savings = sum(t.amount for t in transactions if t.transaction_type == 'fund_contribution')
+
+        funds = Fund.query.all()
+        funds_data = []
+        for fund in funds:
+            funds_data.append({
+                'name': fund.name,
+                'balance': fund.current_balance,
+                'goal': fund.goal,
+                'progress': (fund.current_balance / fund.goal * 100) if fund.goal else 0,
+                'goal_date': fund.goal_date.isoformat() if fund.goal_date else None
+            })
+
+        recent_transactions = Transaction.query.order_by(Transaction.date.desc()).limit(10).all()
+        recent_data = []
+        for t in recent_transactions:
+            recent_data.append({
+                'id': t.id,
+                'amount': t.amount,
+                'type': t.transaction_type,
+                'category': t.category.name,
+                'description': t.description,
+                'merchant': t.merchant,
+                'date': t.date.isoformat()
+            })
+
+        return jsonify({
+            'current_year': year,
+            'gross_income': gross_income,
+            'deductions': deductions,
+            'net_income': net_income,
+            'total_expenses': total_expenses,
+            'total_savings': total_savings,
+            'funds': funds_data,
+            'recent_transactions': recent_data
+        })
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/categories/<int:id>', methods=['PUT'])
@@ -1185,48 +1181,54 @@ def get_category_analysis(year_month):
 @app.route('/api/reports/spending-trends')
 def get_spending_trends():
     try:
-        # Get last 6 months of data
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=180)
-        
+        start_param = request.args.get('start')
+        end_param = request.args.get('end')
+
+        if start_param and end_param:
+            start_date = datetime.strptime(start_param, "%Y-%m").date()
+            end_month = datetime.strptime(end_param, "%Y-%m").date()
+        else:
+            end_date = datetime.now().date()
+            start_date = (end_date - timedelta(days=180)).replace(day=1)
+            end_month = end_date
+
         months = []
         expenses = []
-        
+
         current = start_date.replace(day=1)
-        while current <= end_date:
+        end_marker = end_month.replace(day=1)
+
+        while current <= end_marker:
             month_start = current
             if current.month == 12:
                 month_end = datetime(current.year + 1, 1, 1).date()
             else:
                 month_end = datetime(current.year, current.month + 1, 1).date()
-            
+
             month_expenses = db.session.query(func.sum(Transaction.amount)).filter(
                 Transaction.date >= month_start,
                 Transaction.date < month_end,
                 Transaction.transaction_type == 'expense'
             ).scalar() or 0
-            
+
             months.append(f"{calendar.month_abbr[current.month]} {current.year}")
             expenses.append(month_expenses)
-            
-            # Move to next month
+
             if current.month == 12:
                 current = datetime(current.year + 1, 1, 1).date()
             else:
                 current = datetime(current.year, current.month + 1, 1).date()
-        
-        # Calculate statistics
+
         avg_spending = sum(expenses) / len(expenses) if expenses else 0
         highest_idx = expenses.index(max(expenses)) if expenses else 0
-        
-        # Determine trend
+
         if len(expenses) >= 2:
             recent_avg = sum(expenses[-2:]) / 2
-            older_avg = sum(expenses[:-2]) / (len(expenses) - 2)
+            older_avg = sum(expenses[:-2]) / (len(expenses) - 2) if len(expenses) > 2 else expenses[0]
             trend = 'increasing' if recent_avg > older_avg else 'decreasing'
         else:
             trend = 'insufficient data'
-        
+
         return jsonify({
             'months': months,
             'expenses': expenses,
@@ -1234,6 +1236,48 @@ def get_spending_trends():
             'highest_month': months[highest_idx] if months else '',
             'highest_amount': expenses[highest_idx] if expenses else 0,
             'trend': trend
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reports/period-comparison')
+def period_comparison():
+    try:
+        start1 = request.args.get('start1')
+        end1 = request.args.get('end1')
+        start2 = request.args.get('start2')
+        end2 = request.args.get('end2')
+
+        if not all([start1, end1, start2, end2]):
+            return jsonify({'error': 'Missing date range parameters'}), 400
+
+        def collect_range(start, end):
+            start_date = datetime.strptime(start, "%Y-%m").date().replace(day=1)
+            end_marker = datetime.strptime(end, "%Y-%m").date().replace(day=1)
+            months = []
+            totals = []
+            current = start_date
+            while current <= end_marker:
+                if current.month == 12:
+                    next_month = datetime(current.year + 1, 1, 1).date()
+                else:
+                    next_month = datetime(current.year, current.month + 1, 1).date()
+                month_total = db.session.query(func.sum(Transaction.amount)).filter(
+                    Transaction.date >= current,
+                    Transaction.date < next_month,
+                    Transaction.transaction_type == 'expense'
+                ).scalar() or 0
+                months.append(f"{calendar.month_abbr[current.month]} {current.year}")
+                totals.append(month_total)
+                current = next_month
+            return months, totals
+
+        months1, totals1 = collect_range(start1, end1)
+        months2, totals2 = collect_range(start2, end2)
+
+        return jsonify({
+            'period1': {'months': months1, 'totals': totals1},
+            'period2': {'months': months2, 'totals': totals2}
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1459,38 +1503,6 @@ def add_category_keyword_route():
     add_keyword_category(keyword, category)
     return jsonify({'message': 'Keyword added'}), 200
 
-####
-# API: Subscriptions
-####
-
-@app.route('/api/subscriptions')
-def list_subscriptions():
-    subs = Subscription.query.filter_by(active=True).order_by(Subscription.next_renewal).all()
-    return jsonify([{
-        'id': s.id,
-        'merchant': s.merchant,
-        'amount': s.amount,
-        'next_renewal': s.next_renewal.isoformat(),
-        'frequency_days': s.frequency_days,
-        'notify_days_before': s.notify_days_before,
-        'email': s.email
-    } for s in subs])
-
-
-@app.route('/api/subscriptions/detect', methods=['POST'])
-def detect_subscriptions_endpoint():
-    try:
-        detect_subscriptions()
-        return jsonify({'message': 'Subscription detection completed'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/subscriptions/notify', methods=['POST'])
-def notify_subscriptions():
-    count = send_subscription_notifications()
-    return jsonify({'notifications_sent': count})
 
 # Database initialization function
 def init_database():

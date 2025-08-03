@@ -1,4 +1,41 @@
-    function showReport(reportType) {
+let annualOverviewChart;
+let categoryAnalysisChart;
+let spendingTrendChart;
+let comparisonChart;
+let annualOverviewYear = new Date().getFullYear();
+
+function destroyReportCharts() {
+    if (annualOverviewChart) {
+        annualOverviewChart.destroy();
+        annualOverviewChart = null;
+    }
+    if (categoryAnalysisChart) {
+        categoryAnalysisChart.destroy();
+        categoryAnalysisChart = null;
+    }
+    if (spendingTrendChart) {
+        spendingTrendChart.destroy();
+        spendingTrendChart = null;
+    }
+    if (comparisonChart) {
+        comparisonChart.destroy();
+        comparisonChart = null;
+    }
+}
+
+function changeReportMonth(direction, inputId, callback) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const [year, month] = input.value.split('-').map(Number);
+    const newDate = new Date(year, month - 1 + direction, 1);
+    const newValue = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}`;
+    input.value = newValue;
+    localStorage.setItem('selectedMonth', newValue);
+    if (typeof callback === 'function') callback();
+}
+
+function showReport(reportType) {
+        destroyReportCharts();
         $('#reportDisplay').show();
         $('#reportContent').html('<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>Loading report...</p></div>');
         
@@ -8,21 +45,29 @@
         }, 500);
         
         if (reportType === 'monthly-summary') {
-            const currentMonth = new Date().toISOString().slice(0, 7);
+            const currentMonth = localStorage.getItem('selectedMonth') || new Date().toISOString().slice(0, 7);
             const monthSelector = `
                 <div class="mb-4">
                     <label>Select Month:</label>
-                    <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;" 
-                           id="reportMonth" value="${currentMonth}" onchange="loadMonthlySummary()">
+                    <div class="input-group" style="width: 200px; display: inline-flex; margin-left: 10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'reportMonth', loadMonthlySummary)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <input type="month" class="form-control form-control-sm text-center"
+                               id="reportMonth" value="${currentMonth}" onchange="loadMonthlySummary()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'reportMonth', loadMonthlySummary)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
                 </div>
             `;
-            
+
             $('#reportContent').html(`
                 <h3>Monthly Summary Report</h3>
                 ${monthSelector}
                 <div id="monthlySummaryContent"></div>
             `);
-            
+
             loadMonthlySummary();
         } else if (reportType === 'annual-overview') {
             loadAnnualOverview();
@@ -30,14 +75,17 @@
             loadCategoryAnalysis();
         } else if (reportType === 'spending-trends') {
             loadSpendingTrends();
+        } else if (reportType === 'period-comparison') {
+            loadPeriodComparison();
         } else if (reportType === 'fund-progress') {
             loadFundProgress();
         }
     }
-    
+
     function loadMonthlySummary() {
         const selectedMonth = $('#reportMonth').val();
-        
+        localStorage.setItem('selectedMonth', selectedMonth);
+
         $.get(`/api/reports/monthly-summary/${selectedMonth}`, function(data) {
             let incomeHtml = '<h5>Income Breakdown</h5><table class="table table-sm"><tbody>';
             
@@ -108,12 +156,44 @@
     }
     
     function loadAnnualOverview() {
-        const currentYear = new Date().getFullYear();
-        $.get(`/api/reports/annual-overview/${currentYear}`, function(data) {
-            let monthlyTrendHtml = '<h5>Monthly Trends</h5><canvas id="monthlyTrendChart" width="400" height="200"></canvas>';
-            
+        const yearSelector = `
+            <div class="mb-4">
+                <label>Select Year:</label>
+                <div class="input-group" style="width: 160px; display: inline-flex; margin-left: 10px;">
+                    <button class="btn btn-sm btn-modern-secondary" onclick="changeAnnualOverviewYear(-1)">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <input type="number" class="form-control form-control-sm text-center" id="reportYear" min="2000" max="2100" value="${annualOverviewYear}" onchange="updateAnnualOverview()">
+                    <button class="btn btn-sm btn-modern-secondary" onclick="changeAnnualOverviewYear(1)">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        $('#reportContent').html(`
+            <h3>Annual Overview - <span id="annualOverviewYearLabel">${annualOverviewYear}</span></h3>
+            ${yearSelector}
+            <div id="annualOverviewContent"></div>
+        `);
+
+        updateAnnualOverview();
+    }
+
+    function changeAnnualOverviewYear(direction) {
+        annualOverviewYear += direction;
+        $('#reportYear').val(annualOverviewYear);
+        updateAnnualOverview();
+    }
+
+    function updateAnnualOverview() {
+        annualOverviewYear = parseInt($('#reportYear').val());
+        $('#annualOverviewYearLabel').text(annualOverviewYear);
+
+        $.get(`/api/reports/annual-overview/${annualOverviewYear}`, function(data) {
+            let monthlyTrendHtml = '<h5>Monthly Trends</h5><div class="chart-container" style="height:300px;"><canvas id="monthlyTrendChart"></canvas></div>';
+
             let summaryHtml = `
-                <h3>Annual Overview - ${currentYear}</h3>
                 <div class="row mt-4">
                     <div class="col-md-4">
                         <div class="card text-center">
@@ -144,12 +224,14 @@
                     ${monthlyTrendHtml}
                 </div>
             `;
-            
-            $('#reportContent').html(summaryHtml);
-            
-            // Create the trend chart
+
+            $('#annualOverviewContent').html(summaryHtml);
+
             const ctx = document.getElementById('monthlyTrendChart').getContext('2d');
-            new Chart(ctx, {
+            if (annualOverviewChart) {
+                annualOverviewChart.destroy();
+            }
+            annualOverviewChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: data.months,
@@ -189,24 +271,49 @@
                 }
             });
         }).fail(function() {
-            $('#reportContent').html('<div class="alert alert-warning">No data available for the current year.</div>');
+            $('#annualOverviewContent').html('<div class="alert alert-warning">No data available for the selected year.</div>');
         });
     }
     
     function loadCategoryAnalysis() {
-        const currentMonth = new Date().toISOString().slice(0, 7);
-        $.get(`/api/reports/category-analysis/${currentMonth}`, function(data) {
-            let chartHtml = `
-                <h3>Category Analysis</h3>
-                <div class="mb-4">
-                    <label>Select Month:</label>
-                    <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;" 
-                           id="categoryMonth" value="${currentMonth}" onchange="loadCategoryAnalysis()">
+        if (categoryAnalysisChart) {
+            categoryAnalysisChart.destroy();
+            categoryAnalysisChart = null;
+        }
+        const stored = localStorage.getItem('selectedMonth') || new Date().toISOString().slice(0, 7);
+        const selectedMonth = $('#categoryMonth').val() || stored;
+        localStorage.setItem('selectedMonth', selectedMonth);
+
+        const baseHtml = `
+            <h3>Category Analysis</h3>
+            <div class="mb-4">
+                <label>Select Month:</label>
+                <div class="input-group" style="width: 200px; display: inline-flex; margin-left: 10px;">
+                    <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'categoryMonth', loadCategoryAnalysis)">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <input type="month" class="form-control form-control-sm text-center"
+                           id="categoryMonth" value="${selectedMonth}" onchange="loadCategoryAnalysis()">
+                    <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'categoryMonth', loadCategoryAnalysis)">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
                 </div>
+            </div>
+            <div id="categoryAnalysisContent"></div>
+        `;
+        $('#reportContent').html(baseHtml);
+
+        $.get(`/api/reports/category-analysis/${selectedMonth}`, function(data) {
+            if (!data.categories || data.categories.length === 0) {
+                $('#categoryAnalysisContent').html('<div class="alert alert-warning">No data available for the selected month.</div>');
+                return;
+            }
+
+            let chartHtml = `
                 <div class="row">
                     <div class="col-md-6">
                         <h5>Expense Distribution</h5>
-                        <canvas id="categoryPieChart" width="300" height="300"></canvas>
+                        <div class="chart-container" style="height:300px;"><canvas id="categoryPieChart"></canvas></div>
                     </div>
                     <div class="col-md-6">
                         <h5>Top Categories</h5>
@@ -220,7 +327,7 @@
                             </thead>
                             <tbody>
             `;
-            
+
             data.categories.forEach(cat => {
                 chartHtml += `
                     <tr>
@@ -230,19 +337,21 @@
                     </tr>
                 `;
             });
-            
+
             chartHtml += `
                             </tbody>
                         </table>
                     </div>
                 </div>
             `;
-            
-            $('#reportContent').html(chartHtml);
-            
-            // Create pie chart
+
+            $('#categoryAnalysisContent').html(chartHtml);
+
             const ctx = document.getElementById('categoryPieChart').getContext('2d');
-            new Chart(ctx, {
+            if (categoryAnalysisChart) {
+                categoryAnalysisChart.destroy();
+            }
+            categoryAnalysisChart = new Chart(ctx, {
                 type: 'pie',
                 data: {
                     labels: data.categories.map(c => c.name),
@@ -271,15 +380,50 @@
                     }
                 }
             });
+        }).fail(function() {
+            $('#categoryAnalysisContent').html('<div class="alert alert-warning">No data available for the selected month.</div>');
         });
     }
     
     function loadSpendingTrends() {
-        $.get('/api/reports/spending-trends', function(data) {
+        const endVal = $('#trendEnd').val() || new Date().toISOString().slice(0,7);
+        const startVal = $('#trendStart').val() || (() => { const d = new Date(endVal + '-01'); d.setMonth(d.getMonth()-5); return d.toISOString().slice(0,7); })();
+
+        const selector = `
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label>Start Month:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'trendStart', loadSpendingTrends)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <input type="month" class="form-control form-control-sm text-center" id="trendStart" value="${startVal}" onchange="loadSpendingTrends()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'trendStart', loadSpendingTrends)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label>End Month:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'trendEnd', loadSpendingTrends)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <input type="month" class="form-control form-control-sm text-center" id="trendEnd" value="${endVal}" onchange="loadSpendingTrends()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'trendEnd', loadSpendingTrends)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $.get('/api/reports/spending-trends', { start: startVal, end: endVal }, function(data) {
             let chartHtml = `
-                <h3>Spending Trends - Last 6 Months</h3>
+                <h3>Spending Trends</h3>
+                ${selector}
                 <div class="mt-4">
-                    <canvas id="spendingTrendChart" width="400" height="200"></canvas>
+                    <div class="chart-container" style="height:300px;"><canvas id="spendingTrendChart"></canvas></div>
                 </div>
                 <div class="row mt-4">
                     <div class="col-md-4">
@@ -310,12 +454,12 @@
                     </div>
                 </div>
             `;
-            
+
             $('#reportContent').html(chartHtml);
-            
-            // Create trend chart
+
             const ctx = document.getElementById('spendingTrendChart').getContext('2d');
-            new Chart(ctx, {
+            if (spendingTrendChart) spendingTrendChart.destroy();
+            spendingTrendChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: data.months,
@@ -326,6 +470,104 @@
                         borderColor: 'rgb(214, 40, 40)',
                         borderWidth: 1
                     }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+    function loadPeriodComparison() {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const defaultStart2 = `${currentYear}-01`;
+        const defaultEnd2 = `${currentYear}-06`;
+        const defaultStart1 = `${currentYear - 1}-01`;
+        const defaultEnd1 = `${currentYear - 1}-06`;
+
+        const html = `
+            <h3>Period Comparison</h3>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label>Period 1 Start:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'compStart1', updatePeriodComparison)"><i class="fas fa-chevron-left"></i></button>
+                        <input type="month" class="form-control form-control-sm text-center" id="compStart1" value="${defaultStart1}" onchange="updatePeriodComparison()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'compStart1', updatePeriodComparison)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <label class="mt-2">Period 1 End:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'compEnd1', updatePeriodComparison)"><i class="fas fa-chevron-left"></i></button>
+                        <input type="month" class="form-control form-control-sm text-center" id="compEnd1" value="${defaultEnd1}" onchange="updatePeriodComparison()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'compEnd1', updatePeriodComparison)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label>Period 2 Start:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'compStart2', updatePeriodComparison)"><i class="fas fa-chevron-left"></i></button>
+                        <input type="month" class="form-control form-control-sm text-center" id="compStart2" value="${defaultStart2}" onchange="updatePeriodComparison()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'compStart2', updatePeriodComparison)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <label class="mt-2">Period 2 End:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'compEnd2', updatePeriodComparison)"><i class="fas fa-chevron-left"></i></button>
+                        <input type="month" class="form-control form-control-sm text-center" id="compEnd2" value="${defaultEnd2}" onchange="updatePeriodComparison()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'compEnd2', updatePeriodComparison)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-container" style="height:300px;"><canvas id="periodComparisonChart"></canvas></div>
+        `;
+
+        $('#reportContent').html(html);
+        updatePeriodComparison();
+    }
+
+    function updatePeriodComparison() {
+        const params = {
+            start1: $('#compStart1').val(),
+            end1: $('#compEnd1').val(),
+            start2: $('#compStart2').val(),
+            end2: $('#compEnd2').val()
+        };
+
+        $.get('/api/reports/period-comparison', params, function(data) {
+            const labels = data.period1.months.length >= data.period2.months.length ? data.period1.months : data.period2.months;
+            const ctx = document.getElementById('periodComparisonChart').getContext('2d');
+            if (comparisonChart) comparisonChart.destroy();
+            comparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Period 1',
+                            data: data.period1.totals,
+                            backgroundColor: 'rgba(67,97,238,0.6)',
+                            borderColor: 'rgb(67,97,238)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Period 2',
+                            data: data.period2.totals,
+                            backgroundColor: 'rgba(214,40,40,0.6)',
+                            borderColor: 'rgb(214,40,40)',
+                            borderWidth: 1
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,

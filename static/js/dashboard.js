@@ -1,12 +1,15 @@
     let currentPeriod = 'monthly';
     let categories = [];
-    let currentMonth = new Date().toISOString().slice(0, 7);
+    let currentMonth = localStorage.getItem('selectedMonth') || new Date().toISOString().slice(0, 7);
+    localStorage.setItem('selectedMonth', currentMonth);
+    let currentYear = parseInt(currentMonth.split('-')[0]);
     
     // Load dashboard data on page load
     $(document).ready(function() {
-        // Set current month in selector
+        // Set current selectors
         $('#monthSelector').val(currentMonth);
-        
+        $('#yearSelector').val(currentYear);
+
         loadDashboardData();
         loadCategories();
         loadSankeyData('monthly');
@@ -32,12 +35,14 @@
         const newValue = `${newYear}-${newMonth}`;
         dateInput.value = newValue;
         currentMonth = newValue;
-        
+        localStorage.setItem('selectedMonth', currentMonth);
+
         loadDashboardForMonth();
     }
     
     function loadDashboardForMonth() {
         currentMonth = $('#monthSelector').val();
+        localStorage.setItem('selectedMonth', currentMonth);
         loadDashboardData();
         loadSankeyData(currentPeriod);
     }
@@ -55,6 +60,34 @@
             $('#savingsRate').text(savingsRate + '%');
             
             // Load other components
+            loadFundsProgress(data.funds);
+            loadRecentTransactions(data.recent_transactions);
+            loadBudgetStatus();
+        });
+    }
+
+    function changeYear(direction) {
+        currentYear += direction;
+        $('#yearSelector').val(currentYear);
+        loadDashboardForYear();
+    }
+
+    function loadDashboardForYear() {
+        currentYear = parseInt($('#yearSelector').val());
+        loadSankeyData('annual');
+    }
+
+    function loadDashboardDataYear() {
+        $.get(`/api/dashboard-data/annual/${currentYear}`, function(data) {
+            $('#netIncome').text(formatCurrency(data.net_income));
+            $('#totalExpenses').text(formatCurrency(data.total_expenses));
+
+            const leftToBudget = data.net_income - data.total_expenses - data.total_savings;
+            $('#leftToBudget').text(formatCurrency(leftToBudget));
+
+            const savingsRate = data.net_income > 0 ? ((data.total_savings / data.net_income) * 100).toFixed(0) : 0;
+            $('#savingsRate').text(savingsRate + '%');
+
             loadFundsProgress(data.funds);
             loadRecentTransactions(data.recent_transactions);
             loadBudgetStatus();
@@ -222,7 +255,6 @@
                 $('#addTransactionModal').modal('hide');
                 $('#addTransactionForm')[0].reset();
                 showToast('Transaction added successfully!');
-                loadDashboardData();
                 loadSankeyData(currentPeriod);
             },
             error: function(xhr) {
@@ -234,19 +266,25 @@
     
     function loadSankeyData(period) {
         currentPeriod = period;
-        
+
         // Update button states
         $('.btn-group button').removeClass('active');
         if (period === 'monthly') {
             $('.btn-group button:first').addClass('active');
+            $('#monthNav').removeClass('d-none');
+            $('#yearNav').addClass('d-none');
+            loadDashboardData();
         } else {
             $('.btn-group button:last').addClass('active');
+            $('#yearNav').removeClass('d-none');
+            $('#monthNav').addClass('d-none');
+            loadDashboardDataYear();
         }
-        
-        const url = period === 'monthly' 
+
+        const url = period === 'monthly'
             ? `/api/sankey-data/${period}/${currentMonth}`
-            : `/api/sankey-data/${period}/${currentMonth.split('-')[0]}-01`;
-            
+            : `/api/sankey-data/${period}/${currentYear}-01`;
+
         $.get(url, function(data) {
             drawSankey(data);
         });
