@@ -121,11 +121,17 @@ def _skip_leading_empty(f, limit: int = 10) -> None:
     f.seek(start)
 
 
-DESC_FIELDS = {'description', 'desc', 'payee', 'memo', 'name'}
+DESC_FIELDS = {'description', 'desc', 'payee', 'memo', 'name', 'action'}
 AMOUNT_FIELDS = {'amount', 'amt', 'transaction amount', 'debit', 'credit'}
 DATE_FIELDS = {
-    'date', 'transaction date', 'post date', 'posted date', 'posting date',
-    'date posted'
+    'date',
+    'transaction date',
+    'post date',
+    'posted date',
+    'posting date',
+    'date posted',
+    'run date',
+    'settlement date',
 }
 
 
@@ -166,16 +172,16 @@ def import_csv(path: str) -> Tuple[List[Dict[str, Optional[str]]], Set[str]]:
             date_field = None
             for name in reader.fieldnames:
                 lname = name.lower().strip()
-                if not desc_field and lname in DESC_FIELDS:
+                if not desc_field and (lname in DESC_FIELDS or 'description' in lname):
                     desc_field = name
-                if not amount_field and lname in AMOUNT_FIELDS:
+                if not amount_field and ('amount' in lname or lname in AMOUNT_FIELDS):
                     if lname == 'debit':
                         debit_field = name
                     elif lname == 'credit':
                         credit_field = name
                     else:
                         amount_field = name
-                if not date_field and lname in DATE_FIELDS:
+                if not date_field and ('date' in lname or lname in DATE_FIELDS):
                     date_field = name
             if not desc_field:
                 desc_field = reader.fieldnames[0]
