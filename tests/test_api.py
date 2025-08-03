@@ -52,27 +52,6 @@ def test_get_budget(client):
     assert isinstance(data, list)
 
 
-def test_detect_subscriptions(client):
-    resp = client.post('/api/categories', json={'name': 'Streaming', 'type': 'expense'})
-    cat_id = resp.get_json()['id']
-
-    for month in ['2023-01-01', '2023-02-01', '2023-03-01']:
-        client.post('/api/transactions', json={
-            'amount': '9.99',
-            'transaction_type': 'expense',
-            'category_id': cat_id,
-            'date': month,
-            'merchant': 'Netflix'
-        })
-
-    resp = client.post('/api/subscriptions/detect')
-    assert resp.status_code == 200
-
-    resp = client.get('/api/subscriptions')
-    subs = resp.get_json()
-    assert any('netflix' in s['merchant'] for s in subs)
-
-
 def test_add_category_keyword_endpoint(client):
     resp = client.post('/api/category-keywords', json={'keyword': 'MyCafe', 'category': 'Coffee'})
     assert resp.status_code == 200

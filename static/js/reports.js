@@ -1,7 +1,19 @@
 let annualOverviewChart;
 let categoryAnalysisChart;
 
+function destroyReportCharts() {
+    if (annualOverviewChart) {
+        annualOverviewChart.destroy();
+        annualOverviewChart = null;
+    }
+    if (categoryAnalysisChart) {
+        categoryAnalysisChart.destroy();
+        categoryAnalysisChart = null;
+    }
+}
+
 function showReport(reportType) {
+        destroyReportCharts();
         $('#reportDisplay').show();
         $('#reportContent').html('<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p>Loading report...</p></div>');
         
@@ -113,7 +125,7 @@ function showReport(reportType) {
     function loadAnnualOverview() {
         const currentYear = new Date().getFullYear();
         $.get(`/api/reports/annual-overview/${currentYear}`, function(data) {
-            let monthlyTrendHtml = '<h5>Monthly Trends</h5><canvas id="monthlyTrendChart" width="400" height="200"></canvas>';
+            let monthlyTrendHtml = '<h5>Monthly Trends</h5><div class="chart-container" style="height:300px;"><canvas id="monthlyTrendChart"></canvas></div>';
             
             let summaryHtml = `
                 <h3>Annual Overview - ${currentYear}</h3>
@@ -202,17 +214,22 @@ function showReport(reportType) {
     function loadCategoryAnalysis() {
         const currentMonth = new Date().toISOString().slice(0, 7);
         $.get(`/api/reports/category-analysis/${currentMonth}`, function(data) {
+            if (!data.categories || data.categories.length === 0) {
+                $('#reportContent').html('<div class="alert alert-warning">No data available for the selected month.</div>');
+                return;
+            }
+
             let chartHtml = `
                 <h3>Category Analysis</h3>
                 <div class="mb-4">
                     <label>Select Month:</label>
-                    <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;" 
+                    <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;"
                            id="categoryMonth" value="${currentMonth}" onchange="loadCategoryAnalysis()">
                 </div>
                 <div class="row">
                     <div class="col-md-6">
                         <h5>Expense Distribution</h5>
-                        <canvas id="categoryPieChart" width="300" height="300"></canvas>
+                        <div class="chart-container" style="height:300px;"><canvas id="categoryPieChart"></canvas></div>
                     </div>
                     <div class="col-md-6">
                         <h5>Top Categories</h5>
@@ -226,7 +243,7 @@ function showReport(reportType) {
                             </thead>
                             <tbody>
             `;
-            
+
             data.categories.forEach(cat => {
                 chartHtml += `
                     <tr>
@@ -236,16 +253,16 @@ function showReport(reportType) {
                     </tr>
                 `;
             });
-            
+
             chartHtml += `
                             </tbody>
                         </table>
                     </div>
                 </div>
             `;
-            
+
             $('#reportContent').html(chartHtml);
-            
+
             // Create pie chart
             const ctx = document.getElementById('categoryPieChart').getContext('2d');
             if (categoryAnalysisChart) {
