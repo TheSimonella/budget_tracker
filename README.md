@@ -10,7 +10,7 @@ A personal budgeting application built with **Flask** and **SQLite**. It lets yo
 - Monthly budget setup per category with comparison against actual spending
 - Savings funds with progress tracking and recommended contributions
 - Persistent month selector shared across pages with simple arrow navigation
-- Report pages (monthly summary, annual overview with year selector, category analysis, spending trends)
+- Report pages (monthly summary, annual overview with year selector, category analysis, spending trends with custom date ranges, period comparison)
 - Flexible bank CSV importer that cleans and categorizes transactions and learns new keywords
 - CSV and JSON export of all data and placeholder support for Excel import
 - REST style API endpoints used by the front end (can also be reused by other tools)

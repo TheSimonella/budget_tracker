@@ -92,3 +92,17 @@ def test_dashboard_annual_endpoint(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert 'net_income' in data
+
+
+def test_spending_trends_range(client):
+    resp = client.get('/api/reports/spending-trends?start=2023-01&end=2023-03')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert len(data['months']) == 3
+
+
+def test_period_comparison_endpoint(client):
+    resp = client.get('/api/reports/period-comparison?start1=2023-01&end1=2023-02&start2=2024-01&end2=2024-02')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert 'period1' in data and 'period2' in data

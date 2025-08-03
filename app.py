@@ -1181,48 +1181,54 @@ def get_category_analysis(year_month):
 @app.route('/api/reports/spending-trends')
 def get_spending_trends():
     try:
-        # Get last 6 months of data
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=180)
-        
+        start_param = request.args.get('start')
+        end_param = request.args.get('end')
+
+        if start_param and end_param:
+            start_date = datetime.strptime(start_param, "%Y-%m").date()
+            end_month = datetime.strptime(end_param, "%Y-%m").date()
+        else:
+            end_date = datetime.now().date()
+            start_date = (end_date - timedelta(days=180)).replace(day=1)
+            end_month = end_date
+
         months = []
         expenses = []
-        
+
         current = start_date.replace(day=1)
-        while current <= end_date:
+        end_marker = end_month.replace(day=1)
+
+        while current <= end_marker:
             month_start = current
             if current.month == 12:
                 month_end = datetime(current.year + 1, 1, 1).date()
             else:
                 month_end = datetime(current.year, current.month + 1, 1).date()
-            
+
             month_expenses = db.session.query(func.sum(Transaction.amount)).filter(
                 Transaction.date >= month_start,
                 Transaction.date < month_end,
                 Transaction.transaction_type == 'expense'
             ).scalar() or 0
-            
+
             months.append(f"{calendar.month_abbr[current.month]} {current.year}")
             expenses.append(month_expenses)
-            
-            # Move to next month
+
             if current.month == 12:
                 current = datetime(current.year + 1, 1, 1).date()
             else:
                 current = datetime(current.year, current.month + 1, 1).date()
-        
-        # Calculate statistics
+
         avg_spending = sum(expenses) / len(expenses) if expenses else 0
         highest_idx = expenses.index(max(expenses)) if expenses else 0
-        
-        # Determine trend
+
         if len(expenses) >= 2:
             recent_avg = sum(expenses[-2:]) / 2
-            older_avg = sum(expenses[:-2]) / (len(expenses) - 2)
+            older_avg = sum(expenses[:-2]) / (len(expenses) - 2) if len(expenses) > 2 else expenses[0]
             trend = 'increasing' if recent_avg > older_avg else 'decreasing'
         else:
             trend = 'insufficient data'
-        
+
         return jsonify({
             'months': months,
             'expenses': expenses,
@@ -1230,6 +1236,48 @@ def get_spending_trends():
             'highest_month': months[highest_idx] if months else '',
             'highest_amount': expenses[highest_idx] if expenses else 0,
             'trend': trend
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reports/period-comparison')
+def period_comparison():
+    try:
+        start1 = request.args.get('start1')
+        end1 = request.args.get('end1')
+        start2 = request.args.get('start2')
+        end2 = request.args.get('end2')
+
+        if not all([start1, end1, start2, end2]):
+            return jsonify({'error': 'Missing date range parameters'}), 400
+
+        def collect_range(start, end):
+            start_date = datetime.strptime(start, "%Y-%m").date().replace(day=1)
+            end_marker = datetime.strptime(end, "%Y-%m").date().replace(day=1)
+            months = []
+            totals = []
+            current = start_date
+            while current <= end_marker:
+                if current.month == 12:
+                    next_month = datetime(current.year + 1, 1, 1).date()
+                else:
+                    next_month = datetime(current.year, current.month + 1, 1).date()
+                month_total = db.session.query(func.sum(Transaction.amount)).filter(
+                    Transaction.date >= current,
+                    Transaction.date < next_month,
+                    Transaction.transaction_type == 'expense'
+                ).scalar() or 0
+                months.append(f"{calendar.month_abbr[current.month]} {current.year}")
+                totals.append(month_total)
+                current = next_month
+            return months, totals
+
+        months1, totals1 = collect_range(start1, end1)
+        months2, totals2 = collect_range(start2, end2)
+
+        return jsonify({
+            'period1': {'months': months1, 'totals': totals1},
+            'period2': {'months': months2, 'totals': totals2}
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

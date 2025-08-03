@@ -1,5 +1,7 @@
 let annualOverviewChart;
 let categoryAnalysisChart;
+let spendingTrendChart;
+let comparisonChart;
 let annualOverviewYear = new Date().getFullYear();
 
 function destroyReportCharts() {
@@ -10,6 +12,14 @@ function destroyReportCharts() {
     if (categoryAnalysisChart) {
         categoryAnalysisChart.destroy();
         categoryAnalysisChart = null;
+    }
+    if (spendingTrendChart) {
+        spendingTrendChart.destroy();
+        spendingTrendChart = null;
+    }
+    if (comparisonChart) {
+        comparisonChart.destroy();
+        comparisonChart = null;
     }
 }
 
@@ -65,6 +75,8 @@ function showReport(reportType) {
             loadCategoryAnalysis();
         } else if (reportType === 'spending-trends') {
             loadSpendingTrends();
+        } else if (reportType === 'period-comparison') {
+            loadPeriodComparison();
         } else if (reportType === 'fund-progress') {
             loadFundProgress();
         }
@@ -374,11 +386,44 @@ function showReport(reportType) {
     }
     
     function loadSpendingTrends() {
-        $.get('/api/reports/spending-trends', function(data) {
+        const endVal = $('#trendEnd').val() || new Date().toISOString().slice(0,7);
+        const startVal = $('#trendStart').val() || (() => { const d = new Date(endVal + '-01'); d.setMonth(d.getMonth()-5); return d.toISOString().slice(0,7); })();
+
+        const selector = `
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label>Start Month:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'trendStart', loadSpendingTrends)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <input type="month" class="form-control form-control-sm text-center" id="trendStart" value="${startVal}" onchange="loadSpendingTrends()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'trendStart', loadSpendingTrends)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label>End Month:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'trendEnd', loadSpendingTrends)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <input type="month" class="form-control form-control-sm text-center" id="trendEnd" value="${endVal}" onchange="loadSpendingTrends()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'trendEnd', loadSpendingTrends)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $.get('/api/reports/spending-trends', { start: startVal, end: endVal }, function(data) {
             let chartHtml = `
-                <h3>Spending Trends - Last 6 Months</h3>
+                <h3>Spending Trends</h3>
+                ${selector}
                 <div class="mt-4">
-                    <canvas id="spendingTrendChart" width="400" height="200"></canvas>
+                    <div class="chart-container" style="height:300px;"><canvas id="spendingTrendChart"></canvas></div>
                 </div>
                 <div class="row mt-4">
                     <div class="col-md-4">
@@ -409,12 +454,12 @@ function showReport(reportType) {
                     </div>
                 </div>
             `;
-            
+
             $('#reportContent').html(chartHtml);
-            
-            // Create trend chart
+
             const ctx = document.getElementById('spendingTrendChart').getContext('2d');
-            new Chart(ctx, {
+            if (spendingTrendChart) spendingTrendChart.destroy();
+            spendingTrendChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: data.months,
@@ -425,6 +470,104 @@ function showReport(reportType) {
                         borderColor: 'rgb(214, 40, 40)',
                         borderWidth: 1
                     }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+    function loadPeriodComparison() {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const defaultStart2 = `${currentYear}-01`;
+        const defaultEnd2 = `${currentYear}-06`;
+        const defaultStart1 = `${currentYear - 1}-01`;
+        const defaultEnd1 = `${currentYear - 1}-06`;
+
+        const html = `
+            <h3>Period Comparison</h3>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label>Period 1 Start:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'compStart1', updatePeriodComparison)"><i class="fas fa-chevron-left"></i></button>
+                        <input type="month" class="form-control form-control-sm text-center" id="compStart1" value="${defaultStart1}" onchange="updatePeriodComparison()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'compStart1', updatePeriodComparison)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <label class="mt-2">Period 1 End:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'compEnd1', updatePeriodComparison)"><i class="fas fa-chevron-left"></i></button>
+                        <input type="month" class="form-control form-control-sm text-center" id="compEnd1" value="${defaultEnd1}" onchange="updatePeriodComparison()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'compEnd1', updatePeriodComparison)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label>Period 2 Start:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'compStart2', updatePeriodComparison)"><i class="fas fa-chevron-left"></i></button>
+                        <input type="month" class="form-control form-control-sm text-center" id="compStart2" value="${defaultStart2}" onchange="updatePeriodComparison()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'compStart2', updatePeriodComparison)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <label class="mt-2">Period 2 End:</label>
+                    <div class="input-group" style="width:200px; display:inline-flex; margin-left:10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'compEnd2', updatePeriodComparison)"><i class="fas fa-chevron-left"></i></button>
+                        <input type="month" class="form-control form-control-sm text-center" id="compEnd2" value="${defaultEnd2}" onchange="updatePeriodComparison()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'compEnd2', updatePeriodComparison)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-container" style="height:300px;"><canvas id="periodComparisonChart"></canvas></div>
+        `;
+
+        $('#reportContent').html(html);
+        updatePeriodComparison();
+    }
+
+    function updatePeriodComparison() {
+        const params = {
+            start1: $('#compStart1').val(),
+            end1: $('#compEnd1').val(),
+            start2: $('#compStart2').val(),
+            end2: $('#compEnd2').val()
+        };
+
+        $.get('/api/reports/period-comparison', params, function(data) {
+            const labels = data.period1.months.length >= data.period2.months.length ? data.period1.months : data.period2.months;
+            const ctx = document.getElementById('periodComparisonChart').getContext('2d');
+            if (comparisonChart) comparisonChart.destroy();
+            comparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Period 1',
+                            data: data.period1.totals,
+                            backgroundColor: 'rgba(67,97,238,0.6)',
+                            borderColor: 'rgb(67,97,238)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Period 2',
+                            data: data.period2.totals,
+                            backgroundColor: 'rgba(214,40,40,0.6)',
+                            borderColor: 'rgb(214,40,40)',
+                            borderWidth: 1
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
