@@ -59,18 +59,18 @@
                 const expenseCategories = data.filter(c => c.type === 'expense');
                 const fundCategories = data.filter(c => c.type === 'fund');
 
-                const incomeGroups = getGroupNames('income').filter(n => !n.toLowerCase().includes('deduct'));
-                const deductGroups = getGroupNames('income').filter(n => n.toLowerCase().includes('deduct'));
+                const incomeGroups = getGroups('income').filter(g => !g.name.toLowerCase().includes('deduct'));
+                const deductGroups = getGroups('income').filter(g => g.name.toLowerCase().includes('deduct'));
                 displayCategories(incomeCategories, 'incomeCategories', incomeGroups);
                 displayCategories(deductionCategories, 'deductionCategories', deductGroups);
-                displayCategories(expenseCategories, 'expenseCategories', getGroupNames('expense'));
-                displayCategories(fundCategories, 'fundCategories', getGroupNames('fund'));
+                displayCategories(expenseCategories, 'expenseCategories', getGroups('expense'));
+                displayCategories(fundCategories, 'fundCategories', getGroups('fund'));
             });
         });
     }
 
-    function getGroupNames(type) {
-        return categoryGroups.filter(g => g.type === type).map(g => g.name);
+    function getGroups(type) {
+        return categoryGroups.filter(g => g.type === type);
     }
     
     function loadBudgetComparison(callback) {
@@ -82,32 +82,43 @@
         });
     }
     
-    function displayCategories(categories, containerId, groupNames = []) {
+    function displayCategories(categories, containerId, groupObjs = []) {
         const container = $('#' + containerId);
 
-        if (categories.length === 0 && groupNames.length === 0) {
+        if (categories.length === 0 && groupObjs.length === 0) {
             container.html('<p class="text-muted">No categories added yet. Click "Add" to create your first category.</p>');
             return;
         }
 
         const groups = {};
-        groupNames.forEach(g => groups[g] = []);
+        groupObjs.forEach(g => groups[g.name] = { id: g.id, cats: [] });
         categories.forEach(cat => {
             const group = cat.parent_category || 'Other';
-            if (!groups[group]) groups[group] = [];
-            groups[group].push(cat);
+            if (!groups[group]) groups[group] = { id: null, cats: [] };
+            groups[group].cats.push(cat);
         });
 
         let html = "";
         Object.keys(groups).sort().forEach(g => {
+            const gData = groups[g];
             const safeId = g.replace(/\s+/g, "-");
-            const total = groups[g].reduce((sum, c) => sum + (c.monthly_budget || 0), 0);
-            html += `<div class="mb-3 category-group">
+            const total = gData.cats.reduce((sum, c) => sum + (c.monthly_budget || 0), 0);
+            html += `<div class="mb-3 category-group" data-group-id="${gData.id || ''}">
                         <div class="d-flex justify-content-between align-items-center">
                             <h6 class="mb-0">${g} <span class="badge bg-secondary group-total d-none" id="total-${containerId}-${safeId}">${formatCurrency(total)}</span></h6>
-                            <button class="btn btn-sm btn-outline-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">
-                                <i class="fas fa-caret-down"></i>
-                            </button>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">
+                                    <i class="fas fa-caret-down"></i>
+                                </button>
+                                ${gData.id ? `<div class="dropdown d-inline ms-1">
+                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" onclick="editGroup(${gData.id}, '${g.replace(/'/g, "\\'")}')">Edit Group</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteGroup(${gData.id})">Delete Group</a></li>
+                                    </ul>
+                                </div>` : ''}
+                            </div>
                         </div>
                         <div class="d-flex fw-bold text-end px-2 mt-2">
                             <div class="flex-grow-1"></div>
@@ -118,8 +129,7 @@
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
 
-
-            groups[g].sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
+            gData.cats.sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
                 const comp = comparisonData[cat.name] || {actual:0};
                 const remaining = cat.monthly_budget - comp.actual;
                 html += `
@@ -158,8 +168,14 @@
         });
 
         container.find('.group-categories').sortable({
+            connectWith: '#' + containerId + ' .group-categories',
             update: function(event, ui) {
                 saveOrder(containerId);
+            },
+            receive: function(event, ui) {
+                const group = $(this).data('group');
+                const catId = ui.item.data('id');
+                updateCategoryGroup(catId, group);
             }
         });
     }
@@ -338,6 +354,40 @@
                 const error = xhr.responseJSON?.error || 'Unknown error';
                 showToast('Error adding group: ' + error, 'error');
             }
+        });
+    }
+
+    function editGroup(id, currentName) {
+        const newName = prompt('Group Name', currentName);
+        if (!newName) return;
+        $.ajax({
+            url: `/api/category-groups/${id}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ name: newName }),
+            success: function(){ showToast('Group updated'); loadBudgetForMonth(); },
+            error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error updating group: ' + error, 'error'); }
+        });
+    }
+
+    function deleteGroup(id) {
+        if (!confirm('Delete this group? Categories will move to "Other".')) return;
+        $.ajax({
+            url: `/api/category-groups/${id}`,
+            method: 'DELETE',
+            success: function(){ showToast('Group deleted'); loadBudgetForMonth(); },
+            error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error deleting group: ' + error, 'error'); }
+        });
+    }
+
+    function updateCategoryGroup(catId, groupName) {
+        const parent = groupName === 'Other' ? null : groupName;
+        $.ajax({
+            url: `/api/categories/${catId}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ parent_category: parent }),
+            error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error moving category: ' + error, 'error'); loadBudgetForMonth(); }
         });
     }
     function updateSummary() {
