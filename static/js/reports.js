@@ -23,21 +23,21 @@ function showReport(reportType) {
         }, 500);
         
         if (reportType === 'monthly-summary') {
-            const currentMonth = new Date().toISOString().slice(0, 7);
+            const currentMonth = localStorage.getItem('selectedMonth') || new Date().toISOString().slice(0, 7);
             const monthSelector = `
                 <div class="mb-4">
                     <label>Select Month:</label>
-                    <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;" 
+                    <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;"
                            id="reportMonth" value="${currentMonth}" onchange="loadMonthlySummary()">
                 </div>
             `;
-            
+
             $('#reportContent').html(`
                 <h3>Monthly Summary Report</h3>
                 ${monthSelector}
                 <div id="monthlySummaryContent"></div>
             `);
-            
+
             loadMonthlySummary();
         } else if (reportType === 'annual-overview') {
             loadAnnualOverview();
@@ -52,7 +52,8 @@ function showReport(reportType) {
     
     function loadMonthlySummary() {
         const selectedMonth = $('#reportMonth').val();
-        
+        localStorage.setItem('selectedMonth', selectedMonth);
+
         $.get(`/api/reports/monthly-summary/${selectedMonth}`, function(data) {
             let incomeHtml = '<h5>Income Breakdown</h5><table class="table table-sm"><tbody>';
             
@@ -212,20 +213,32 @@ function showReport(reportType) {
     }
     
     function loadCategoryAnalysis() {
-        const currentMonth = new Date().toISOString().slice(0, 7);
-        $.get(`/api/reports/category-analysis/${currentMonth}`, function(data) {
+        if (categoryAnalysisChart) {
+            categoryAnalysisChart.destroy();
+            categoryAnalysisChart = null;
+        }
+        const stored = localStorage.getItem('selectedMonth') || new Date().toISOString().slice(0, 7);
+        const selectedMonth = $('#categoryMonth').val() || stored;
+        localStorage.setItem('selectedMonth', selectedMonth);
+
+        const baseHtml = `
+            <h3>Category Analysis</h3>
+            <div class="mb-4">
+                <label>Select Month:</label>
+                <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;"
+                       id="categoryMonth" value="${selectedMonth}" onchange="loadCategoryAnalysis()">
+            </div>
+            <div id="categoryAnalysisContent"></div>
+        `;
+        $('#reportContent').html(baseHtml);
+
+        $.get(`/api/reports/category-analysis/${selectedMonth}`, function(data) {
             if (!data.categories || data.categories.length === 0) {
-                $('#reportContent').html('<div class="alert alert-warning">No data available for the selected month.</div>');
+                $('#categoryAnalysisContent').html('<div class="alert alert-warning">No data available for the selected month.</div>');
                 return;
             }
 
             let chartHtml = `
-                <h3>Category Analysis</h3>
-                <div class="mb-4">
-                    <label>Select Month:</label>
-                    <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;"
-                           id="categoryMonth" value="${currentMonth}" onchange="loadCategoryAnalysis()">
-                </div>
                 <div class="row">
                     <div class="col-md-6">
                         <h5>Expense Distribution</h5>
@@ -261,9 +274,8 @@ function showReport(reportType) {
                 </div>
             `;
 
-            $('#reportContent').html(chartHtml);
+            $('#categoryAnalysisContent').html(chartHtml);
 
-            // Create pie chart
             const ctx = document.getElementById('categoryPieChart').getContext('2d');
             if (categoryAnalysisChart) {
                 categoryAnalysisChart.destroy();
@@ -297,6 +309,8 @@ function showReport(reportType) {
                     }
                 }
             });
+        }).fail(function() {
+            $('#categoryAnalysisContent').html('<div class="alert alert-warning">No data available for the selected month.</div>');
         });
     }
     

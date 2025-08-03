@@ -1,10 +1,16 @@
-    let currentMonth = new Date().toISOString().slice(0, 7);
+    let currentMonth = localStorage.getItem('selectedMonth') || new Date().toISOString().slice(0, 7);
+    localStorage.setItem('selectedMonth', currentMonth);
     let allCategories = [];
     let comparisonData = {};
 
     let categoryGroups = [];
     $(document).ready(function() {
         $('#monthSelector').val(currentMonth);
+        $('#monthSelector').change(function(){
+            currentMonth = $(this).val();
+            localStorage.setItem('selectedMonth', currentMonth);
+            loadBudgetForMonth();
+        });
         loadBudgetForMonth();
     });
     
@@ -20,12 +26,14 @@
         const newValue = `${newYear}-${newMonth}`;
         dateInput.value = newValue;
         currentMonth = newValue;
-        
+        localStorage.setItem('selectedMonth', currentMonth);
+
         loadBudgetForMonth();
     }
     
     function loadBudgetForMonth() {
         currentMonth = $('#monthSelector').val();
+        localStorage.setItem('selectedMonth', currentMonth);
         const [year, month] = currentMonth.split('-');
         $('#comparisonMonth').text(`${getMonthName(parseInt(month))} ${year}`);
         

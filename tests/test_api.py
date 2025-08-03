@@ -85,3 +85,10 @@ def test_import_csv_endpoint_handles_year_and_blanks(client, tmp_path):
         assert after == before + 1
         tx = Transaction.query.order_by(Transaction.id.desc()).first()
         assert tx.date == date_cls(2025, 7, 1)
+
+
+def test_dashboard_annual_endpoint(client):
+    resp = client.get('/api/dashboard-data/annual/2023')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert 'net_income' in data

@@ -279,6 +279,62 @@ def delete_category(id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/dashboard-data/annual/<int:year>')
+def get_dashboard_data_annual(year):
+    try:
+        start_date = datetime(year, 1, 1).date()
+        end_date = datetime(year + 1, 1, 1).date()
+
+        transactions = Transaction.query.filter(
+            Transaction.date >= start_date,
+            Transaction.date < end_date
+        ).all()
+
+        gross_income = sum(t.amount for t in transactions
+                           if t.transaction_type == 'income' and 'deduction' not in t.category.name.lower())
+        deductions = sum(t.amount for t in transactions
+                        if t.transaction_type == 'income' and 'deduction' in t.category.name.lower())
+        net_income = gross_income - deductions
+        total_expenses = sum(t.amount for t in transactions if t.transaction_type == 'expense')
+        total_savings = sum(t.amount for t in transactions if t.transaction_type == 'fund_contribution')
+
+        funds = Fund.query.all()
+        funds_data = []
+        for fund in funds:
+            funds_data.append({
+                'name': fund.name,
+                'balance': fund.current_balance,
+                'goal': fund.goal,
+                'progress': (fund.current_balance / fund.goal * 100) if fund.goal else 0,
+                'goal_date': fund.goal_date.isoformat() if fund.goal_date else None
+            })
+
+        recent_transactions = Transaction.query.order_by(Transaction.date.desc()).limit(10).all()
+        recent_data = []
+        for t in recent_transactions:
+            recent_data.append({
+                'id': t.id,
+                'amount': t.amount,
+                'type': t.transaction_type,
+                'category': t.category.name,
+                'description': t.description,
+                'merchant': t.merchant,
+                'date': t.date.isoformat()
+            })
+
+        return jsonify({
+            'current_year': year,
+            'gross_income': gross_income,
+            'deductions': deductions,
+            'net_income': net_income,
+            'total_expenses': total_expenses,
+            'total_savings': total_savings,
+            'funds': funds_data,
+            'recent_transactions': recent_data
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/categories/<int:id>', methods=['PUT'])
 def update_category(id):
     try:

@@ -1,9 +1,15 @@
     let categories = [];
-    let currentMonth = new Date().toISOString().slice(0, 7);
+    let currentMonth = localStorage.getItem('selectedMonth') || new Date().toISOString().slice(0, 7);
+    localStorage.setItem('selectedMonth', currentMonth);
     let editingTransactionId = null;
 
     $(document).ready(function() {
         $('#monthFilter').val(currentMonth);
+        $('#monthFilter').change(function(){
+            currentMonth = $(this).val();
+            localStorage.setItem('selectedMonth', currentMonth);
+            loadTransactions();
+        });
         loadCategories();
         loadTransactions();
         $('input[name="date"]').val(new Date().toISOString().split('T')[0]);
@@ -57,7 +63,8 @@
         const newValue = `${newYear}-${newMonth}`;
         dateInput.value = newValue;
         currentMonth = newValue;
-        
+        localStorage.setItem('selectedMonth', currentMonth);
+
         loadTransactions();
     }
     
