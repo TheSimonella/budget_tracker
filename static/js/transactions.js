@@ -1,21 +1,49 @@
     let categories = [];
     let currentMonth = new Date().toISOString().slice(0, 7);
     let editingTransactionId = null;
-    
+
     $(document).ready(function() {
         $('#monthFilter').val(currentMonth);
         loadCategories();
         loadTransactions();
         $('input[name="date"]').val(new Date().toISOString().split('T')[0]);
-        
+
         $('select[name="transaction_type"]').change(function() {
             updateCategoryDropdown($(this).val());
         });
-        
+
         $('#editTransactionForm select[name="transaction_type"]').change(function() {
             updateCategoryDropdownEdit($(this).val());
         });
+
+        $('#csvFileInput').change(handleCsvImport);
     });
+
+    function handleCsvImport() {
+        const input = document.getElementById('csvFileInput');
+        if (!input.files.length) return;
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+
+        $.ajax({
+            url: '/api/import-csv',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                showToast(res.message || 'Imported transactions successfully');
+                loadTransactions();
+            },
+            error: function(xhr) {
+                const msg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Failed to import CSV';
+                showToast(msg);
+            },
+            complete: function() {
+                input.value = '';
+            }
+        });
+    }
     
     function changeTransactionMonth(direction) {
         const dateInput = document.getElementById('monthFilter');
@@ -158,7 +186,7 @@
                         </td>
                         <td><span class="category-pill ${typeClass}">${trans.category}</span></td>
                         <td>${trans.merchant || '-'}</td>
-                        <td class="${amountClass} text-end">${amountSign}${formatCurrency(trans.amount)}</td>
+                        <td class="${amountClass} text-end">${amountSign}${formatCurrency(Math.abs(trans.amount))}</td>
                         <td>
                             <div class="action-buttons text-end">
                                 <button class="btn btn-sm btn-link text-primary p-1" onclick="editTransaction(${trans.id})">

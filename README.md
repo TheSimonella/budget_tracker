@@ -10,6 +10,7 @@ A personal budgeting application built with **Flask** and **SQLite**. It lets yo
 - Monthly budget setup per category with comparison against actual spending
 - Savings funds with progress tracking and recommended contributions
 - Report pages (monthly summary, annual overview, category analysis, spending trends)
+- Flexible bank CSV importer that cleans and categorizes transactions and learns new keywords
 - CSV and JSON export of all data and placeholder support for Excel import
 - REST style API endpoints used by the front end (can also be reused by other tools)
 - Automatic detection of recurring subscriptions with optional renewal notifications
@@ -30,6 +31,9 @@ A personal budgeting application built with **Flask** and **SQLite**. It lets yo
 ├── start_budget_tracker.bat  # Convenience launcher for Windows
 ├── start_budget_tracker.ps1  # PowerShell version of the launcher
 ├── debug_start.bat          # Script to help debug Windows setup issues
+├── csv_importer.py          # Flexible CSV parsing and categorization logic
+├── categories.py            # Category helpers and keyword library
+├── category_keywords.json   # Default category keyword definitions
 ├── requirements.txt         # Python dependencies
 ├── test_setup.py            # Environment verification helper
 └── README.md                # This file
@@ -73,9 +77,11 @@ The HTML templates under `templates/` use Bootstrap 5 and minimal inline JavaScr
 
 If database changes are required, the helper function `migrate_database()` in `app.py` runs on startup and will add missing columns where possible. For more complex migrations you may want to create your own scripts.
 
-## Export / import
+## Import / export
 
-The app can export transactions and other data to CSV or JSON via `/api/export/csv` and `/api/export/json`. An Excel import endpoint exists (`/api/import-excel`) as a placeholder – adapt the implementation to match your spreadsheet format if needed.
+Upload bank statements through the **Transactions** page or POST a file to `/api/import-csv`. The importer auto-detects common CSV layouts, skips preamble lines and uses a keyword library to categorize merchants. Unknown merchants are reported so new keywords can be added at runtime. Default keywords live in `category_keywords.json` and can be extended via the `/api/categories/keywords` endpoint or by editing the file.
+
+Transactions and other data can be exported to CSV or JSON via `/api/export/csv` and `/api/export/json`. An Excel import endpoint exists (`/api/import-excel`) as a placeholder – adapt the implementation to match your spreadsheet format if needed.
 
 ## Troubleshooting
 

@@ -13,7 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (stored) {
     applyTheme(stored);
   } else {
-    applyTheme(root.dataset.theme || 'light');
+    localStorage.setItem('theme', 'light');
+    applyTheme('light');
   }
 
   if (btn) {

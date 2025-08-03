@@ -174,7 +174,7 @@
                         </div>
                     </div>
                     <div class="transaction-amount ${amountClass}">
-                        ${sign}${formatCurrency(trans.amount)}
+                        ${sign}${formatCurrency(Math.abs(trans.amount))}
                     </div>
                 </div>
             `;
