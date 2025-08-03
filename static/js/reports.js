@@ -1,5 +1,6 @@
 let annualOverviewChart;
 let categoryAnalysisChart;
+let annualOverviewYear = new Date().getFullYear();
 
 function destroyReportCharts() {
     if (annualOverviewChart) {
@@ -10,6 +11,17 @@ function destroyReportCharts() {
         categoryAnalysisChart.destroy();
         categoryAnalysisChart = null;
     }
+}
+
+function changeReportMonth(direction, inputId, callback) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const [year, month] = input.value.split('-').map(Number);
+    const newDate = new Date(year, month - 1 + direction, 1);
+    const newValue = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}`;
+    input.value = newValue;
+    localStorage.setItem('selectedMonth', newValue);
+    if (typeof callback === 'function') callback();
 }
 
 function showReport(reportType) {
@@ -27,8 +39,16 @@ function showReport(reportType) {
             const monthSelector = `
                 <div class="mb-4">
                     <label>Select Month:</label>
-                    <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;"
-                           id="reportMonth" value="${currentMonth}" onchange="loadMonthlySummary()">
+                    <div class="input-group" style="width: 200px; display: inline-flex; margin-left: 10px;">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'reportMonth', loadMonthlySummary)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <input type="month" class="form-control form-control-sm text-center"
+                               id="reportMonth" value="${currentMonth}" onchange="loadMonthlySummary()">
+                        <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'reportMonth', loadMonthlySummary)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
                 </div>
             `;
 
@@ -49,7 +69,7 @@ function showReport(reportType) {
             loadFundProgress();
         }
     }
-    
+
     function loadMonthlySummary() {
         const selectedMonth = $('#reportMonth').val();
         localStorage.setItem('selectedMonth', selectedMonth);
@@ -124,12 +144,44 @@ function showReport(reportType) {
     }
     
     function loadAnnualOverview() {
-        const currentYear = new Date().getFullYear();
-        $.get(`/api/reports/annual-overview/${currentYear}`, function(data) {
+        const yearSelector = `
+            <div class="mb-4">
+                <label>Select Year:</label>
+                <div class="input-group" style="width: 160px; display: inline-flex; margin-left: 10px;">
+                    <button class="btn btn-sm btn-modern-secondary" onclick="changeAnnualOverviewYear(-1)">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <input type="number" class="form-control form-control-sm text-center" id="reportYear" min="2000" max="2100" value="${annualOverviewYear}" onchange="updateAnnualOverview()">
+                    <button class="btn btn-sm btn-modern-secondary" onclick="changeAnnualOverviewYear(1)">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        $('#reportContent').html(`
+            <h3>Annual Overview - <span id="annualOverviewYearLabel">${annualOverviewYear}</span></h3>
+            ${yearSelector}
+            <div id="annualOverviewContent"></div>
+        `);
+
+        updateAnnualOverview();
+    }
+
+    function changeAnnualOverviewYear(direction) {
+        annualOverviewYear += direction;
+        $('#reportYear').val(annualOverviewYear);
+        updateAnnualOverview();
+    }
+
+    function updateAnnualOverview() {
+        annualOverviewYear = parseInt($('#reportYear').val());
+        $('#annualOverviewYearLabel').text(annualOverviewYear);
+
+        $.get(`/api/reports/annual-overview/${annualOverviewYear}`, function(data) {
             let monthlyTrendHtml = '<h5>Monthly Trends</h5><div class="chart-container" style="height:300px;"><canvas id="monthlyTrendChart"></canvas></div>';
-            
+
             let summaryHtml = `
-                <h3>Annual Overview - ${currentYear}</h3>
                 <div class="row mt-4">
                     <div class="col-md-4">
                         <div class="card text-center">
@@ -160,10 +212,9 @@ function showReport(reportType) {
                     ${monthlyTrendHtml}
                 </div>
             `;
-            
-            $('#reportContent').html(summaryHtml);
-            
-            // Create the trend chart
+
+            $('#annualOverviewContent').html(summaryHtml);
+
             const ctx = document.getElementById('monthlyTrendChart').getContext('2d');
             if (annualOverviewChart) {
                 annualOverviewChart.destroy();
@@ -208,7 +259,7 @@ function showReport(reportType) {
                 }
             });
         }).fail(function() {
-            $('#reportContent').html('<div class="alert alert-warning">No data available for the current year.</div>');
+            $('#annualOverviewContent').html('<div class="alert alert-warning">No data available for the selected year.</div>');
         });
     }
     
@@ -225,8 +276,16 @@ function showReport(reportType) {
             <h3>Category Analysis</h3>
             <div class="mb-4">
                 <label>Select Month:</label>
-                <input type="month" class="form-control" style="width: 200px; display: inline-block; margin-left: 10px;"
-                       id="categoryMonth" value="${selectedMonth}" onchange="loadCategoryAnalysis()">
+                <div class="input-group" style="width: 200px; display: inline-flex; margin-left: 10px;">
+                    <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(-1, 'categoryMonth', loadCategoryAnalysis)">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <input type="month" class="form-control form-control-sm text-center"
+                           id="categoryMonth" value="${selectedMonth}" onchange="loadCategoryAnalysis()">
+                    <button class="btn btn-sm btn-modern-secondary" onclick="changeReportMonth(1, 'categoryMonth', loadCategoryAnalysis)">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
             </div>
             <div id="categoryAnalysisContent"></div>
         `;
