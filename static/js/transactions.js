@@ -4,8 +4,8 @@
     let editingTransactionId = null;
 
     $(document).ready(function() {
-        $('#monthFilter').val(currentMonth);
-        $('#monthFilter').change(function(){
+        $('#monthSelector').val(currentMonth);
+        $('#monthSelector').change(function(){
             currentMonth = $(this).val();
             localStorage.setItem('selectedMonth', currentMonth);
             loadTransactions();
@@ -51,8 +51,8 @@
         });
     }
     
-    function changeTransactionMonth(direction) {
-        const dateInput = document.getElementById('monthFilter');
+    function changeMonth(direction) {
+        const dateInput = document.getElementById('monthSelector');
         const currentValue = dateInput.value;
         const [year, month] = currentValue.split('-').map(Number);
         
@@ -149,7 +149,7 @@
     
     function loadTransactions() {
         const params = {
-            month: $('#monthFilter').val(),
+            month: $('#monthSelector').val(),
             type: $('#typeFilter').val(),
             category: $('#categoryFilter').val(),
             search: $('#searchFilter').val()
