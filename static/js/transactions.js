@@ -186,7 +186,7 @@
                         </td>
                         <td><span class="category-pill ${typeClass}">${trans.category}</span></td>
                         <td>${trans.merchant || '-'}</td>
-                        <td class="${amountClass} text-end">${amountSign}${formatCurrency(trans.amount)}</td>
+                        <td class="${amountClass} text-end">${amountSign}${formatCurrency(Math.abs(trans.amount))}</td>
                         <td>
                             <div class="action-buttons text-end">
                                 <button class="btn btn-sm btn-link text-primary p-1" onclick="editTransaction(${trans.id})">

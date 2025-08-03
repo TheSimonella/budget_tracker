@@ -1428,9 +1428,10 @@ def import_csv_route():
                     continue
             if not date_obj:
                 continue
+            raw_amount = float(row['amount'])
             tx = Transaction(
-                amount=float(row['amount']),
-                transaction_type='expense' if float(row['amount']) < 0 else 'income',
+                amount=abs(raw_amount),
+                transaction_type='expense' if raw_amount < 0 else 'income',
                 category_id=cat.id,
                 description=row['merchant'],
                 merchant=row['merchant'],
