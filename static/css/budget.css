@@ -9,17 +9,17 @@
     /* Grid layout for consistent column alignment */
     .category-grid {
         display: grid;
-        grid-template-columns: 1fr 110px 110px 110px 24px;
+        grid-template-columns: 24px 1fr 110px 110px 110px 24px;
         align-items: center;
     }
 
-    .category-info {
+    .category-name {
         display: flex;
         align-items: center;
     }
 
-    .category-info.editable,
-    .category-info .editable {
+    .category-name.editable,
+    .category-name .editable {
         cursor: pointer;
     }
 
@@ -41,12 +41,16 @@
     .editable-budget {
         background-color: var(--card-background-color);
         color: var(--text-color);
-        border: 1px solid #ced4da;
-        padding: 2px 6px;
-        border-radius: 4px;
+        border: none;
+        padding: 0;
         min-width: 80px;
         width: 100%;
         text-align: right;
+    }
+
+    .editable-budget:focus {
+        outline: none;
+        border-bottom: 1px solid #ced4da;
     }
 
     .badge-success {
@@ -57,16 +61,20 @@
         background-color: #dc3545;
     }
 
-    .group-toggle {
-        cursor: pointer;
-    }
+.group-toggle {
+    cursor: pointer;
+}
 
-    .group-toggle.collapsed i {
-        transform: rotate(-90deg);
-    }
+.group-toggle.collapsed i {
+    transform: rotate(-90deg);
+}
+
+.category-toggle {
+    text-align: center;
+}
 
     .category-progress {
-        grid-column: 2 / span 3;
+        grid-column: 3 / span 3;
         height: 4px;
         margin-top: 8px;
     }

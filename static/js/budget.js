@@ -4,6 +4,8 @@
     let comparisonData = {};
 
     let categoryGroups = [];
+    let editingCategory = null;
+    let editingGroupId = null;
     $(document).ready(function() {
         $('#monthSelector').val(currentMonth);
         $('#monthSelector').change(function(){
@@ -112,14 +114,12 @@
             const groupNameEsc = g.replace(/'/g, "\\'");
             html += `<div class="mb-3 category-group" data-group-id="${gData.id || ''}">
                         <div class="category-item group-header category-grid">
-                            <div class="category-info">
-                                <span class="me-2 text-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}"><i class="fas fa-caret-down"></i></span>
-                                <h6 class="mb-0 ${gData.id ? 'editable' : ''}" ${gData.id ? `onclick=\"editGroup(${gData.id}, '${groupNameEsc}')\"` : ''}>${g}</h6>
-                            </div>
+                            <div class="category-toggle"><span class="text-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}"><i class="fas fa-caret-down"></i></span></div>
+                            <div class="category-name ${gData.id ? 'editable' : ''}" ${gData.id ? `onclick=\"editGroup(${gData.id}, '${groupNameEsc}')\"` : ''}>${g}</div>
                             <div class="category-budget">${formatCurrency(totals.budget)}</div>
                             <div class="category-actual">${formatCurrency(totals.actual)}</div>
                             <div class="category-remaining">${formatCurrency(totals.remaining)}</div>
-                            ${gData.id ? `<button class="btn btn-sm btn-link text-danger p-0" onclick="deleteGroup(${gData.id})"><i class="fas fa-trash"></i></button>` : '<div></div>'}
+                            <div class="category-actions"></div>
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
 
@@ -131,11 +131,12 @@
                 const barClass = comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger';
                 html += `
                     <div class="category-item category-grid" data-id="${cat.id}">
-                        <div class="category-info editable" onclick='editCategory(${JSON.stringify(cat)})'>${cat.name}</div>
+                        <div class="category-toggle"></div>
+                        <div class="category-name editable" onclick='editCategory(${JSON.stringify(cat)})'>${cat.name}</div>
                         <div class="category-budget"><input type="number" step="0.01" class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
                         <div class="category-actual">${formatCurrency(comp.actual)}</div>
                         <div class="category-remaining">${formatCurrency(remaining)}</div>
-                        <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteCategory(${cat.id})"><i class="fas fa-trash"></i></button>
+                        <div class="category-actions"></div>
                         <div class="progress category-progress">
                             <div class="progress-bar ${barClass}" style="width:${progPct}%"></div>
                         </div>
@@ -181,19 +182,36 @@
     }
 
     function editCategory(cat) {
-        const newName = prompt('Category Name', cat.name);
-        if (newName === null) return;
-        const newBudget = prompt('Default Monthly Budget', cat.default_budget);
-        if (newBudget === null || isNaN(newBudget)) return;
-        const newGroup = prompt('Group', cat.parent_category || '');
+        editingCategory = cat;
+        $('#editCategoryName').val(cat.name);
+        $('#editCategoryBudget').val(cat.default_budget !== undefined ? cat.default_budget : cat.monthly_budget);
+        const groupSelect = $('#editCategoryGroup');
+        groupSelect.empty();
+        groupSelect.append('<option value="">Other</option>');
+        getGroups(cat.type).forEach(g => {
+            groupSelect.append(`<option value="${g.name}" ${cat.parent_category === g.name ? 'selected' : ''}>${g.name}</option>`);
+        });
+        const modal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
+        modal.show();
+        $('#deleteCategoryBtn').off('click').on('click', function() {
+            modal.hide();
+            deleteCategory(editingCategory.id);
+        });
+    }
+
+    function saveCategoryEdits() {
+        const name = $('#editCategoryName').val().trim();
+        const defaultBudget = parseFloat($('#editCategoryBudget').val());
+        const parent = $('#editCategoryGroup').val() || null;
         $.ajax({
-            url: `/api/categories/${cat.id}`,
+            url: `/api/categories/${editingCategory.id}`,
             method: 'PUT',
             contentType: 'application/json',
-            data: JSON.stringify({name:newName, default_budget:parseFloat(newBudget), parent_category:newGroup}),
+            data: JSON.stringify({name: name, default_budget: defaultBudget, parent_category: parent}),
             success: function(){ showToast('Category updated'); loadBudgetForMonth(); },
             error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error: '+error,'error'); }
         });
+        bootstrap.Modal.getInstance(document.getElementById('editCategoryModal')).hide();
     }
     
     function updateAllDefaults() {
@@ -341,16 +359,27 @@
     }
 
     function editGroup(id, currentName) {
-        const newName = prompt('Group Name', currentName);
-        if (!newName) return;
+        editingGroupId = id;
+        $('#editGroupName').val(currentName);
+        const modal = new bootstrap.Modal(document.getElementById('editGroupModal'));
+        modal.show();
+        $('#deleteGroupBtn').off('click').on('click', function() {
+            modal.hide();
+            deleteGroup(editingGroupId);
+        });
+    }
+
+    function saveGroupEdits() {
+        const name = $('#editGroupName').val().trim();
         $.ajax({
-            url: `/api/category-groups/${id}`,
+            url: `/api/category-groups/${editingGroupId}`,
             method: 'PUT',
             contentType: 'application/json',
-            data: JSON.stringify({ name: newName }),
+            data: JSON.stringify({ name: name }),
             success: function(){ showToast('Group updated'); loadBudgetForMonth(); },
             error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error updating group: ' + error, 'error'); }
         });
+        bootstrap.Modal.getInstance(document.getElementById('editGroupModal')).hide();
     }
 
     function deleteGroup(id) {
