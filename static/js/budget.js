@@ -102,23 +102,32 @@
         Object.keys(groups).sort().forEach(g => {
             const gData = groups[g];
             const safeId = g.replace(/\s+/g, "-");
-            const total = gData.cats.reduce((sum, c) => sum + (c.monthly_budget || 0), 0);
+            const totals = gData.cats.reduce((acc, c) => {
+                const comp = comparisonData[c.name] || {actual:0};
+                acc.budget += c.monthly_budget || 0;
+                acc.actual += comp.actual;
+                acc.remaining += (c.monthly_budget || 0) - comp.actual;
+                return acc;
+            }, {budget:0, actual:0, remaining:0});
             html += `<div class="mb-3 category-group" data-group-id="${gData.id || ''}">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">${g} <span class="badge bg-secondary group-total d-none" id="total-${containerId}-${safeId}">${formatCurrency(total)}</span></h6>
-                            <div>
-                                <button class="btn btn-sm btn-outline-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">
+                        <div class="category-item group-header">
+                            <div class="category-info d-flex align-items-center">
+                                <button class="btn btn-sm btn-outline-secondary group-toggle me-2" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">
                                     <i class="fas fa-caret-down"></i>
                                 </button>
-                                ${gData.id ? `<div class="dropdown d-inline ms-1">
+                                <h6 class="mb-0">${g}</h6>
+                            </div>
+                            <div class="category-budget">${formatCurrency(totals.budget)}</div>
+                            <div class="category-actual">${formatCurrency(totals.actual)}</div>
+                            <div class="category-remaining">${formatCurrency(totals.remaining)}</div>
+                            ${gData.id ? `<div class="dropdown ms-2">
                                     <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
                                     <ul class="dropdown-menu">
                                         <li><a class="dropdown-item" href="#" onclick="editGroup(${gData.id}, '${g.replace(/'/g, "\\'")}')">Edit Group</a></li>
                                         <li><hr class="dropdown-divider"></li>
                                         <li><a class="dropdown-item text-danger" href="#" onclick="deleteGroup(${gData.id})">Delete Group</a></li>
                                     </ul>
-                                </div>` : ''}
-                            </div>
+                                </div>` : '<div style="width:24px"></div>'}
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
 
@@ -130,22 +139,22 @@
                 const barClass = comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger';
                 html += `
                     <div class="category-item" data-id="${cat.id}">
-                        <div class="category-info">
-                            <h6 class="mb-1">${cat.name}</h6>
-                            <div class="progress category-progress">
-                                <div class="progress-bar ${barClass}" style="width:${progPct}%"></div>
+                        <div class="category-row">
+                            <div class="category-info">${cat.name}</div>
+                            <div class="category-budget"><input type="number" step="0.01" class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
+                            <div class="category-actual">${formatCurrency(comp.actual)}</div>
+                            <div class="category-remaining">${formatCurrency(remaining)}</div>
+                            <div class="dropdown ms-2">
+                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" onclick='editCategory(${JSON.stringify(cat)})'>Edit Category</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteCategory(${cat.id})">Delete</a></li>
+                                </ul>
                             </div>
                         </div>
-                        <div class="category-budget"><input type="number" step="0.01" class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
-                        <div class="category-actual">${formatCurrency(comp.actual)}</div>
-                        <div class="category-remaining">${formatCurrency(remaining)}</div>
-                        <div class="dropdown ms-2">
-                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#" onclick='editCategory(${JSON.stringify(cat)})'>Edit Category</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteCategory(${cat.id})">Delete</a></li>
-                            </ul>
+                        <div class="progress category-progress">
+                            <div class="progress-bar ${barClass}" style="width:${progPct}%"></div>
                         </div>
                     </div>`;
             });
@@ -154,17 +163,6 @@
         });
 
         container.html(html);
-
-        Object.keys(groups).forEach(g => {
-            const safeId = g.replace(/\s+/g, '-');
-            const collapseId = `#grp-${containerId}-${safeId}`;
-            $(collapseId).on('hide.bs.collapse', function(){
-                $(`#total-${containerId}-${safeId}`).removeClass('d-none');
-            });
-            $(collapseId).on('show.bs.collapse', function(){
-                $(`#total-${containerId}-${safeId}`).addClass('d-none');
-            });
-        });
 
         container.find('.group-categories').sortable({
             connectWith: '#' + containerId + ' .group-categories',
@@ -386,6 +384,7 @@
             method: 'PUT',
             contentType: 'application/json',
             data: JSON.stringify({ parent_category: parent }),
+            success: function(){ loadCategories(); },
             error: function(xhr){ const error = xhr.responseJSON?.error || 'Unknown error'; showToast('Error moving category: ' + error, 'error'); loadBudgetForMonth(); }
         });
     }
