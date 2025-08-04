@@ -20,25 +20,24 @@
     <div class="col-lg-8" id="budgetSections">
 
 <!-- Income Categories -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">
-            <i class="fas fa-arrow-up text-success"></i> Income Sources
-            <button class="btn btn-sm btn-light float-end ms-2" onclick="toggleAddCategoryForm('income')">
-                <i class="fas fa-plus"></i> Add Income
-            </button>
-            <button class="btn btn-sm btn-light float-end" onclick="addGroup('income')">
-                <i class="fas fa-folder-plus"></i> Add Group
-            </button>
-        </h5>
+    <div class="card mb-4">
+    <div class="card-header d-flex align-items-center">
+        <span class="section-icon"><i class="fas fa-arrow-up text-success"></i></span>
+        <h5 class="mb-0 flex-grow-1">Income Sources</h5>
+        <button class="btn btn-sm btn-light ms-auto me-2" onclick="toggleAddCategoryForm('income')">
+            <i class="fas fa-plus"></i> Add Income
+        </button>
+        <button class="btn btn-sm btn-light" onclick="addGroup('income')">
+            <i class="fas fa-folder-plus"></i> Add Group
+        </button>
     </div>
     <div class="card-body">
         <div class="category-columns category-grid">
             <div></div>
             <div></div>
-            <div class="text-muted">Budget</div>
-            <div class="text-muted">Actual</div>
-            <div class="text-muted">Remaining</div>
+            <div class="category-budget text-muted text-end pe-2">Budget</div>
+            <div class="category-actual text-muted text-end pe-2">Actual</div>
+            <div class="category-remaining text-muted text-end pe-2">Remaining</div>
             <div></div>
         </div>
         <div id="incomeCategories">
@@ -65,25 +64,24 @@
 </div>
 
 <!-- Deduction Categories -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">
-            <i class="fas fa-minus-circle text-warning"></i> Deductions
-            <button class="btn btn-sm btn-light float-end ms-2" onclick="toggleAddCategoryForm('deduction')">
-                <i class="fas fa-plus"></i> Add Deduction
-            </button>
-            <button class="btn btn-sm btn-light float-end" onclick="addGroup('income')">
-                <i class="fas fa-folder-plus"></i> Add Group
-            </button>
-        </h5>
+    <div class="card mb-4">
+    <div class="card-header d-flex align-items-center">
+        <span class="section-icon"><i class="fas fa-minus-circle text-warning"></i></span>
+        <h5 class="mb-0 flex-grow-1">Deductions</h5>
+        <button class="btn btn-sm btn-light ms-auto me-2" onclick="toggleAddCategoryForm('deduction')">
+            <i class="fas fa-plus"></i> Add Deduction
+        </button>
+        <button class="btn btn-sm btn-light" onclick="addGroup('income')">
+            <i class="fas fa-folder-plus"></i> Add Group
+        </button>
     </div>
     <div class="card-body">
         <div class="category-columns category-grid">
             <div></div>
             <div></div>
-            <div class="text-muted">Budget</div>
-            <div class="text-muted">Actual</div>
-            <div class="text-muted">Remaining</div>
+            <div class="category-budget text-muted text-end pe-2">Budget</div>
+            <div class="category-actual text-muted text-end pe-2">Actual</div>
+            <div class="category-remaining text-muted text-end pe-2">Remaining</div>
             <div></div>
         </div>
         <div id="deductionCategories">
@@ -110,25 +108,24 @@
 </div>
 
 <!-- Expense Categories -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">
-            <i class="fas fa-arrow-down text-danger"></i> Expense Categories
-            <button class="btn btn-sm btn-light float-end ms-2" onclick="toggleAddCategoryForm('expense')">
-                <i class="fas fa-plus"></i> Add Expense
-            </button>
-            <button class="btn btn-sm btn-light float-end" onclick="addGroup('expense')">
-                <i class="fas fa-folder-plus"></i> Add Group
-            </button>
-        </h5>
+    <div class="card mb-4">
+    <div class="card-header d-flex align-items-center">
+        <span class="section-icon"><i class="fas fa-arrow-down text-danger"></i></span>
+        <h5 class="mb-0 flex-grow-1">Expense Categories</h5>
+        <button class="btn btn-sm btn-light ms-auto me-2" onclick="toggleAddCategoryForm('expense')">
+            <i class="fas fa-plus"></i> Add Expense
+        </button>
+        <button class="btn btn-sm btn-light" onclick="addGroup('expense')">
+            <i class="fas fa-folder-plus"></i> Add Group
+        </button>
     </div>
     <div class="card-body">
         <div class="category-columns category-grid">
             <div></div>
             <div></div>
-            <div class="text-muted">Budget</div>
-            <div class="text-muted">Actual</div>
-            <div class="text-muted">Remaining</div>
+            <div class="category-budget text-muted text-end pe-2">Budget</div>
+            <div class="category-actual text-muted text-end pe-2">Actual</div>
+            <div class="category-remaining text-muted text-end pe-2">Remaining</div>
             <div></div>
         </div>
         <div id="expenseCategories">
@@ -156,18 +153,17 @@
 
 <!-- Fund Expenses -->
 <div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">
-            <i class="fas fa-piggy-bank text-primary"></i> Fund Contributions
-        </h5>
+    <div class="card-header d-flex align-items-center">
+        <span class="section-icon"><i class="fas fa-piggy-bank text-primary"></i></span>
+        <h5 class="mb-0 flex-grow-1">Fund Contributions</h5>
     </div>
     <div class="card-body">
         <div class="category-columns category-grid">
             <div></div>
             <div></div>
-            <div class="text-muted">Budget</div>
-            <div class="text-muted">Actual</div>
-            <div class="text-muted">Remaining</div>
+            <div class="category-budget text-muted text-end pe-2">Budget</div>
+            <div class="category-actual text-muted text-end pe-2">Actual</div>
+            <div class="category-remaining text-muted text-end pe-2">Remaining</div>
             <div></div>
         </div>
         <div id="fundCategories">

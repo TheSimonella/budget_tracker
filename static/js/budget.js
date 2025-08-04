@@ -116,9 +116,9 @@
                         <div class="category-item group-header category-grid">
                             <div class="category-toggle"><span class="text-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}"><i class="fas fa-caret-down"></i></span></div>
                             <div class="category-name ${gData.id ? 'editable' : ''}" ${gData.id ? `onclick=\"editGroup(${gData.id}, '${groupNameEsc}')\"` : ''}>${g}</div>
-                            <div class="category-budget">${formatCurrency(totals.budget)}</div>
-                            <div class="category-actual">${formatCurrency(totals.actual)}</div>
-                            <div class="category-remaining">${formatCurrency(totals.remaining)}</div>
+                            <div class="category-budget text-end pe-2">${formatCurrency(totals.budget)}</div>
+                            <div class="category-actual text-end pe-2">${formatCurrency(totals.actual)}</div>
+                            <div class="category-remaining text-end pe-2">${formatCurrency(totals.remaining)}</div>
                             <div class="category-actions"></div>
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
@@ -133,9 +133,9 @@
                     <div class="category-item category-grid" data-id="${cat.id}">
                         <div class="category-toggle"></div>
                         <div class="category-name editable" onclick='editCategory(${JSON.stringify(cat)})'>${cat.name}</div>
-                        <div class="category-budget"><input type="number" step="0.01" class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
-                        <div class="category-actual">${formatCurrency(comp.actual)}</div>
-                        <div class="category-remaining">${formatCurrency(remaining)}</div>
+                        <div class="category-budget"><input type="number" step="0.01" class="form-control form-control-sm text-end editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
+                        <div class="category-actual text-end pe-2">${formatCurrency(comp.actual)}</div>
+                        <div class="category-remaining text-end pe-2">${formatCurrency(remaining)}</div>
                         <div class="category-actions"></div>
                         <div class="progress category-progress">
                             <div class="progress-bar ${barClass}" style="width:${progPct}%"></div>

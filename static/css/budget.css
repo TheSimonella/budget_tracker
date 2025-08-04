@@ -39,18 +39,7 @@
     }
 
     .editable-budget {
-        background-color: var(--card-background-color);
-        color: var(--text-color);
-        border: none;
-        padding: 0;
-        min-width: 80px;
-        width: 100%;
         text-align: right;
-    }
-
-    .editable-budget:focus {
-        outline: none;
-        border-bottom: 1px solid #ced4da;
     }
 
     .badge-success {
@@ -89,4 +78,16 @@
 
     .category-columns.category-grid {
         margin-bottom: 8px;
+        padding: 0 15px;
+        width: 100%;
+    }
+
+    #budgetSections .card-header {
+        padding-left: 31px;
+        padding-right: 15px;
+    }
+
+    .section-icon {
+        width: 24px;
+        text-align: center;
     }
