@@ -109,25 +109,17 @@
                 acc.remaining += (c.monthly_budget || 0) - comp.actual;
                 return acc;
             }, {budget:0, actual:0, remaining:0});
+            const groupNameEsc = g.replace(/'/g, "\\'");
             html += `<div class="mb-3 category-group" data-group-id="${gData.id || ''}">
-                        <div class="category-item group-header">
-                            <div class="category-info d-flex align-items-center">
-                                <button class="btn btn-sm btn-outline-secondary group-toggle me-2" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}">
-                                    <i class="fas fa-caret-down"></i>
-                                </button>
-                                <h6 class="mb-0">${g}</h6>
+                        <div class="category-item group-header category-grid">
+                            <div class="category-info">
+                                <span class="me-2 text-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}"><i class="fas fa-caret-down"></i></span>
+                                <h6 class="mb-0 ${gData.id ? 'editable' : ''}" ${gData.id ? `onclick=\"editGroup(${gData.id}, '${groupNameEsc}')\"` : ''}>${g}</h6>
                             </div>
                             <div class="category-budget">${formatCurrency(totals.budget)}</div>
                             <div class="category-actual">${formatCurrency(totals.actual)}</div>
                             <div class="category-remaining">${formatCurrency(totals.remaining)}</div>
-                            ${gData.id ? `<div class="dropdown ms-2">
-                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
-                                    <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" href="#" onclick="editGroup(${gData.id}, '${g.replace(/'/g, "\\'")}')">Edit Group</a></li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteGroup(${gData.id})">Delete Group</a></li>
-                                    </ul>
-                                </div>` : '<div style="width:24px"></div>'}
+                            ${gData.id ? `<button class="btn btn-sm btn-link text-danger p-0" onclick="deleteGroup(${gData.id})"><i class="fas fa-trash"></i></button>` : '<div></div>'}
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
 
@@ -138,21 +130,12 @@
                 const progPct = Math.min(pct, 100);
                 const barClass = comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger';
                 html += `
-                    <div class="category-item" data-id="${cat.id}">
-                        <div class="category-row">
-                            <div class="category-info">${cat.name}</div>
-                            <div class="category-budget"><input type="number" step="0.01" class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
-                            <div class="category-actual">${formatCurrency(comp.actual)}</div>
-                            <div class="category-remaining">${formatCurrency(remaining)}</div>
-                            <div class="dropdown ms-2">
-                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="#" onclick='editCategory(${JSON.stringify(cat)})'>Edit Category</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteCategory(${cat.id})">Delete</a></li>
-                                </ul>
-                            </div>
-                        </div>
+                    <div class="category-item category-grid" data-id="${cat.id}">
+                        <div class="category-info editable" onclick='editCategory(${JSON.stringify(cat)})'>${cat.name}</div>
+                        <div class="category-budget"><input type="number" step="0.01" class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
+                        <div class="category-actual">${formatCurrency(comp.actual)}</div>
+                        <div class="category-remaining">${formatCurrency(remaining)}</div>
+                        <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteCategory(${cat.id})"><i class="fas fa-trash"></i></button>
                         <div class="progress category-progress">
                             <div class="progress-bar ${barClass}" style="width:${progPct}%"></div>
                         </div>
@@ -180,7 +163,10 @@
     function saveOrder(containerId) {
         const order = [];
         $('#' + containerId + ' .category-item').each(function(i, el) {
-            order.push({id: $(el).data('id'), sort_order: i});
+            const id = $(el).data('id');
+            if (id !== undefined) {
+                order.push({id: id, sort_order: order.length});
+            }
         });
         $.ajax({
             url: '/api/categories/reorder',

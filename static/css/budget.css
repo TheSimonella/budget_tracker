@@ -6,14 +6,21 @@
         margin-bottom: 10px;
     }
 
-    .category-item .category-row,
-    .category-item.group-header {
-        display: flex;
+    /* Grid layout for consistent column alignment */
+    .category-grid {
+        display: grid;
+        grid-template-columns: 1fr 110px 110px 110px 24px;
         align-items: center;
     }
 
     .category-info {
-        flex-grow: 1;
+        display: flex;
+        align-items: center;
+    }
+
+    .category-info.editable,
+    .category-info .editable {
+        cursor: pointer;
     }
 
     .category-budget,
@@ -50,11 +57,16 @@
         background-color: #dc3545;
     }
 
+    .group-toggle {
+        cursor: pointer;
+    }
+
     .group-toggle.collapsed i {
         transform: rotate(-90deg);
     }
 
     .category-progress {
+        grid-column: 2 / span 3;
         height: 4px;
         margin-top: 8px;
     }
@@ -65,4 +77,8 @@
 
     .category-columns {
         font-weight: 600;
+    }
+
+    .category-columns.category-grid {
+        margin-bottom: 8px;
     }
