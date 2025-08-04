@@ -30,7 +30,6 @@ function changeReportMonth(direction, inputId, callback) {
     const newDate = new Date(year, month - 1 + direction, 1);
     const newValue = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}`;
     input.value = newValue;
-    localStorage.setItem('selectedMonth', newValue);
     if (typeof callback === 'function') callback();
 }
 
@@ -282,7 +281,6 @@ function showReport(reportType) {
         }
         const stored = localStorage.getItem('selectedMonth') || new Date().toISOString().slice(0, 7);
         const selectedMonth = $('#categoryMonth').val() || stored;
-        localStorage.setItem('selectedMonth', selectedMonth);
 
         const baseHtml = `
             <h3>Category Analysis</h3>

@@ -10,10 +10,14 @@
 <!-- Month Selector and Add Transaction -->
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Dashboard</h4>
-    <div class="d-flex align-items-center">
-        <button class="btn btn-modern-primary me-2" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
             <i class="fas fa-plus me-1"></i> Add Transaction
         </button>
+        <div class="btn-group btn-group-sm" id="periodToggle" role="group">
+            <button type="button" class="btn btn-sm btn-outline-secondary active" onclick="loadSankeyData('monthly')">Month</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadSankeyData('annual')">Year</button>
+        </div>
         <div class="input-group" id="monthNav" style="width: 200px;">
             <button class="btn btn-sm btn-modern-secondary" onclick="changeMonth(-1)">
                 <i class="fas fa-chevron-left"></i>
@@ -42,17 +46,17 @@
             <div class="row">
                 <div class="col-6 col-md-3 summary-item">
                     <div class="summary-label">Net Income</div>
-                    <div class="summary-value" id="netIncome">$0</div>
+                    <div class="summary-value" id="netIncome">$0.00</div>
                     <div class="summary-subtext">after deductions</div>
                 </div>
                 <div class="col-6 col-md-3 summary-item">
                     <div class="summary-label">Expenses</div>
-                    <div class="summary-value" id="totalExpenses">$0</div>
+                    <div class="summary-value" id="totalExpenses">$0.00</div>
                     <div class="summary-subtext">this month</div>
                 </div>
                 <div class="col-6 col-md-3 summary-item">
                     <div class="summary-label">Left to Budget</div>
-                    <div class="summary-value" id="leftToBudget">$0</div>
+                    <div class="summary-value" id="leftToBudget">$0.00</div>
                     <div class="summary-subtext">remaining</div>
                 </div>
                 <div class="col-6 col-md-3 summary-item">
@@ -72,10 +76,6 @@
         <div class="modern-card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 Cash Flow
-                <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-sm btn-outline-secondary active" onclick="loadSankeyData('monthly')">Month</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadSankeyData('annual')">Year</button>
-                </div>
             </div>
             <div class="card-body">
                 <div id="sankeyDiagram"></div>

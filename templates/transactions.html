@@ -10,7 +10,7 @@
 <!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">Transactions</h4>
-    <div class="d-flex gap-2">
+    <div class="d-flex align-items-center gap-2">
         <input type="file" id="csvFileInput" accept=".csv" class="d-none">
         <button class="btn btn-modern-secondary" onclick="$('#csvFileInput').click()">
             <i class="fas fa-file-import me-1"></i> Import CSV
@@ -18,25 +18,22 @@
         <button class="btn btn-modern-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
             <i class="fas fa-plus me-1"></i> Add Transaction
         </button>
+        <div class="input-group" id="monthNav" style="width: 200px;">
+            <button class="btn btn-sm btn-modern-secondary" onclick="changeMonth(-1)">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <input type="month" class="form-control form-control-sm text-center" id="monthSelector" onchange="loadTransactions()">
+            <button class="btn btn-sm btn-modern-secondary" onclick="changeMonth(1)">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
     </div>
 </div>
 
 <!-- Filters -->
 <div class="filter-bar">
     <div class="row g-3">
-        <div class="col-md-3 filter-group">
-            <label class="form-label small text-muted mb-1">Month</label>
-            <div class="modern-input-group">
-                <button class="btn btn-sm btn-modern-secondary" onclick="changeTransactionMonth(-1)">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <input type="month" class="form-control form-control-sm text-center" id="monthFilter" onchange="loadTransactions()">
-                <button class="btn btn-sm btn-modern-secondary" onclick="changeTransactionMonth(1)">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        </div>
-        <div class="col-md-3 filter-group">
+        <div class="col-md-4 filter-group">
             <label class="form-label small text-muted mb-1">Type</label>
             <select class="form-select form-select-sm" id="typeFilter" onchange="loadTransactions()">
                 <option value="">All Types</option>
@@ -45,13 +42,13 @@
                 <option value="fund_withdrawal">Fund Withdrawal</option>
             </select>
         </div>
-        <div class="col-md-3 filter-group">
+        <div class="col-md-4 filter-group">
             <label class="form-label small text-muted mb-1">Category</label>
             <select class="form-select form-select-sm" id="categoryFilter" onchange="loadTransactions()">
                 <option value="">All Categories</option>
             </select>
         </div>
-        <div class="col-md-3 filter-group">
+        <div class="col-md-4 filter-group">
             <label class="form-label small text-muted mb-1">Search</label>
             <div class="input-group input-group-sm">
                 <span class="input-group-text"><i class="fas fa-search"></i></span>
@@ -83,10 +80,9 @@
         </div>
         
         <!-- Empty State -->
-        <div id="emptyState" class="empty-state" style="display: none;">
-            <i class="fas fa-receipt"></i>
-            <h5>No transactions found</h5>
-            <p class="mb-0">Try adjusting your filters or add a new transaction.</p>
+        <div id="emptyState" class="empty-state">
+            <div class="spinner-border text-secondary mb-3" role="status"></div>
+            <h5>Loading...</h5>
         </div>
     </div>
 </div>

@@ -268,14 +268,14 @@
         currentPeriod = period;
 
         // Update button states
-        $('.btn-group button').removeClass('active');
+        $('#periodToggle button').removeClass('active');
         if (period === 'monthly') {
-            $('.btn-group button:first').addClass('active');
+            $('#periodToggle button:first').addClass('active');
             $('#monthNav').removeClass('d-none');
             $('#yearNav').addClass('d-none');
             loadDashboardData();
         } else {
-            $('.btn-group button:last').addClass('active');
+            $('#periodToggle button:last').addClass('active');
             $('#yearNav').removeClass('d-none');
             $('#monthNav').addClass('d-none');
             loadDashboardDataYear();

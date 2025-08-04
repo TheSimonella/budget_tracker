@@ -4,12 +4,23 @@
         padding: 15px;
         border-radius: 8px;
         margin-bottom: 10px;
+    }
+
+    /* Grid layout for consistent column alignment */
+    .category-grid {
+        display: grid;
+        grid-template-columns: 24px 1fr 110px 110px 110px 24px;
+        align-items: center;
+    }
+
+    .category-name {
         display: flex;
         align-items: center;
     }
 
-    .category-info {
-        flex-grow: 1;
+    .category-name.editable,
+    .category-name .editable {
+        cursor: pointer;
     }
 
     .category-budget,
@@ -28,13 +39,6 @@
     }
 
     .editable-budget {
-        background-color: var(--card-background-color);
-        color: var(--text-color);
-        border: 1px solid #ced4da;
-        padding: 2px 6px;
-        border-radius: 4px;
-        min-width: 80px;
-        width: 100%;
         text-align: right;
     }
 
@@ -46,6 +50,44 @@
         background-color: #dc3545;
     }
 
-    .group-toggle.collapsed i {
-        transform: rotate(-90deg);
+.group-toggle {
+    cursor: pointer;
+}
+
+.group-toggle.collapsed i {
+    transform: rotate(-90deg);
+}
+
+.category-toggle {
+    text-align: center;
+}
+
+    .category-progress {
+        grid-column: 3 / span 3;
+        height: 4px;
+        margin-top: 8px;
+    }
+
+    .category-progress .progress-bar {
+        height: 4px;
+    }
+
+    .category-columns {
+        font-weight: 600;
+    }
+
+    .category-columns.category-grid {
+        margin-bottom: 8px;
+        padding: 0 15px;
+        width: 100%;
+    }
+
+    #budgetSections .card-header {
+        padding-left: 31px;
+        padding-right: 15px;
+    }
+
+    .section-icon {
+        width: 24px;
+        text-align: center;
     }

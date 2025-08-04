@@ -421,6 +421,38 @@ def create_category_group():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/category-groups/<int:group_id>", methods=["PUT"])
+def update_category_group(group_id):
+    try:
+        group = CategoryGroup.query.get_or_404(group_id)
+        data = request.json or {}
+        new_name = data.get("name")
+        if not new_name:
+            return jsonify({"error": "Name required"}), 400
+        existing = CategoryGroup.query.filter_by(name=new_name, type=group.type).first()
+        if existing and existing.id != group_id:
+            return jsonify({"error": "Group already exists"}), 400
+        old_name = group.name
+        group.name = new_name
+        Category.query.filter_by(parent_category=old_name, type=group.type).update({"parent_category": new_name})
+        db.session.commit()
+        return jsonify({"message": "Group updated"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/category-groups/<int:group_id>", methods=["DELETE"])
+def delete_category_group(group_id):
+    try:
+        group = CategoryGroup.query.get_or_404(group_id)
+        Category.query.filter_by(parent_category=group.name, type=group.type).update({"parent_category": None})
+        db.session.delete(group)
+        db.session.commit()
+        return jsonify({"message": "Group deleted"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 
 ####
 # API: Transactions
