@@ -9,7 +9,7 @@
     /* Grid layout for consistent column alignment */
     .category-grid {
         display: grid;
-        grid-template-columns: 24px 1fr 110px 110px 110px 24px;
+        grid-template-columns: 24px 1fr 120px 120px 120px 24px;
         align-items: center;
     }
 
@@ -26,8 +26,9 @@
     .category-budget,
     .category-actual,
     .category-remaining {
-        width: 110px;
-        text-align: right;
+        display: flex;
+        justify-content: flex-end;
+        padding-right: 0.5rem;
     }
 
     .add-category-form {
@@ -38,8 +39,20 @@
         margin-top: 20px;
     }
 
-    .editable-budget {
+    .category-budget .editable-budget {
+        width: 100%;
         text-align: right;
+        border: 1px dashed var(--gray-400);
+        background-color: var(--gray-100);
+        border-radius: 4px;
+        padding: 2px 0.5rem;
+        box-sizing: border-box;
+    }
+
+    .category-budget .editable-budget:focus {
+        border-color: var(--primary-color);
+        background-color: var(--card-background-color);
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
     }
 
     .badge-success {
@@ -83,7 +96,7 @@
     }
 
     #budgetSections .card-header {
-        padding-left: 31px;
+        padding-left: 15px;
         padding-right: 15px;
     }
 
