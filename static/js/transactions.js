@@ -155,16 +155,17 @@
             search: $('#searchFilter').val()
         };
         
+        const tbody = $('#transactionTableBody');
+        const emptyState = $('#emptyState');
+        tbody.empty();
+        emptyState.show().html('<div class="spinner-border text-secondary mb-3" role="status"></div><h5>Loading...</h5>');
+
         $.get('/api/transactions', params, function(transactions) {
-            const tbody = $('#transactionTableBody');
-            const emptyState = $('#emptyState');
-            
             if (transactions.length === 0) {
-                tbody.empty();
-                emptyState.show();
+                emptyState.html('<i class="fas fa-receipt"></i><h5>No transactions found</h5><p class="mb-0">Try adjusting your filters or add a new transaction.</p>');
                 return;
             }
-            
+
             emptyState.hide();
             let html = '';
             

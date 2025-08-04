@@ -49,3 +49,16 @@
     .group-toggle.collapsed i {
         transform: rotate(-90deg);
     }
+
+    .category-progress {
+        height: 4px;
+        margin-top: 4px;
+    }
+
+    .category-progress .progress-bar {
+        height: 4px;
+    }
+
+    .category-columns {
+        font-weight: 600;
+    }

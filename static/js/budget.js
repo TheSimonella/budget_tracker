@@ -120,22 +120,21 @@
                                 </div>` : ''}
                             </div>
                         </div>
-                        <div class="d-flex fw-bold text-end px-2 mt-2">
-                            <div class="flex-grow-1"></div>
-                            <div class="category-budget">Budget</div>
-                            <div class="category-actual">Actual</div>
-                            <div class="category-remaining">Remaining</div>
-                            <div style="width:24px"></div>
-                        </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
 
             gData.cats.sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
                 const comp = comparisonData[cat.name] || {actual:0};
                 const remaining = cat.monthly_budget - comp.actual;
+                const pct = cat.monthly_budget ? (comp.actual / cat.monthly_budget) * 100 : (comp.actual > 0 ? 100 : 0);
+                const progPct = Math.min(pct, 100);
+                const barClass = comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger';
                 html += `
                     <div class="category-item" data-id="${cat.id}">
                         <div class="category-info">
                             <h6 class="mb-1">${cat.name}</h6>
+                            <div class="progress category-progress">
+                                <div class="progress-bar ${barClass}" style="width:${progPct}%"></div>
+                            </div>
                         </div>
                         <div class="category-budget"><input type="number" step="0.01" class="editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
                         <div class="category-actual">${formatCurrency(comp.actual)}</div>
