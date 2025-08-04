@@ -40,13 +40,22 @@
     }
 
     .category-budget .editable-budget {
-        width: 100%;
+        width: calc(100% + 0.5rem);
+        margin-right: -0.5rem;
         text-align: right;
         border: 1px dashed var(--gray-400);
         background-color: var(--gray-100);
         border-radius: 4px;
         padding: 2px 0.5rem;
         box-sizing: border-box;
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+
+    .category-budget .editable-budget::-webkit-outer-spin-button,
+    .category-budget .editable-budget::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
     }
 
     .category-budget .editable-budget:focus {
