@@ -101,7 +101,8 @@
         });
 
         let html = "";
-        Object.keys(groups).sort().forEach(g => {
+        // Maintain the order provided by the API so new groups appear first
+        Object.keys(groups).forEach(g => {
             const gData = groups[g];
             const safeId = g.replace(/\s+/g, "-");
             const totals = gData.cats.reduce((acc, c) => {

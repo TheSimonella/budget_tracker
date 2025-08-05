@@ -106,3 +106,22 @@ def test_period_comparison_endpoint(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert 'period1' in data and 'period2' in data
+
+
+def test_new_category_and_group_at_top(client):
+    # Add two categories and ensure the second one appears first
+    client.post('/api/categories', json={'name': 'FirstCat', 'type': 'expense'})
+    client.post('/api/categories', json={'name': 'SecondCat', 'type': 'expense'})
+
+    resp = client.get('/api/budget/2023-01')
+    data = resp.get_json()
+    first = next(c for c in data if c['name'] == 'FirstCat')
+    second = next(c for c in data if c['name'] == 'SecondCat')
+    assert second['sort_order'] < first['sort_order']
+
+    # Add two groups and check that the newest is first
+    client.post('/api/category-groups', json={'name': 'GroupA', 'type': 'expense'})
+    client.post('/api/category-groups', json={'name': 'GroupB', 'type': 'expense'})
+    resp = client.get('/api/category-groups?type=expense')
+    groups = resp.get_json()
+    assert groups[0]['name'] == 'GroupB'

@@ -248,12 +248,19 @@ def create_category():
         if existing:
             return jsonify({'error': 'Category with this name already exists'}), 400
 
+        # Place new categories at the top by giving them the smallest sort order
+        min_sort = db.session.query(func.min(Category.sort_order)) \
+            .filter_by(type=data['type']).scalar()
+        if min_sort is None:
+            min_sort = 0
+
         cat = Category(
             name=data['name'],
             type=data['type'],
             default_budget=budget_amount,
             parent_category=parent_category,
-            is_custom=True
+            is_custom=True,
+            sort_order=min_sort - 1
         )
         db.session.add(cat)
         db.session.commit()
@@ -399,7 +406,8 @@ def list_category_groups():
         q = CategoryGroup.query
         if gtype:
             q = q.filter_by(type=gtype)
-        groups = q.order_by(CategoryGroup.name).all()
+        # Return newest groups first so recently added ones appear at the top
+        groups = q.order_by(CategoryGroup.id.desc()).all()
         return jsonify([{"id": g.id, "name": g.name, "type": g.type} for g in groups])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
