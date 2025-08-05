@@ -287,7 +287,6 @@
         const isHidden = !el.classList.contains('show');
         collapse.toggle();
         if (isHidden) {
-            el.scrollIntoView({behavior: 'smooth', block: 'start'});
             const input = el.querySelector('input[name="name"]');
             if (input) {
                 input.focus();
@@ -300,7 +299,6 @@
         const el = document.getElementById('add' + formType + 'Form');
         const collapse = bootstrap.Collapse.getOrCreateInstance(el);
         collapse.show();
-        el.scrollIntoView({behavior: 'smooth', block: 'start'});
         const input = el.querySelector('input[name="name"]');
         if (input) {
             input.focus();
