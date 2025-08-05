@@ -204,16 +204,19 @@ def get_dashboard_data(year_month):
 @app.route('/api/categories')
 def get_categories():
     try:
-        cats = Category.query.order_by(Category.name).all()
-        return jsonify([{ 
-            'id': c.id,
-            'name': c.name,
-            'type': c.type,
-            'default_budget': c.default_budget,
-            'parent_category': c.parent_category,
-            'is_custom': c.is_custom,
-            'sort_order': c.sort_order
-        } for c in cats])
+        cats = Category.query.order_by(Category.sort_order, Category.name).all()
+        return jsonify([
+            {
+                'id': c.id,
+                'name': c.name,
+                'type': c.type,
+                'default_budget': c.default_budget,
+                'parent_category': c.parent_category,
+                'is_custom': c.is_custom,
+                'sort_order': c.sort_order,
+            }
+            for c in cats
+        ])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -237,6 +240,13 @@ def create_category():
                 parent_category = 'Expenses'
             elif data['type'] == 'fund':
                 parent_category = 'Savings'
+
+        # Ensure the parent group exists so the category appears at the top
+        if parent_category:
+            group = CategoryGroup.query.filter_by(name=parent_category, type=data['type']).first()
+            if not group:
+                db.session.add(CategoryGroup(name=parent_category, type=data['type']))
+                db.session.flush()
         
         # Validate budget amount
         budget_amount, error = validate_amount(data.get('monthly_budget', 0))
@@ -248,12 +258,19 @@ def create_category():
         if existing:
             return jsonify({'error': 'Category with this name already exists'}), 400
 
+        # Place new categories at the top by giving them the smallest sort order
+        min_sort = db.session.query(func.min(Category.sort_order)) \
+            .filter_by(type=data['type']).scalar()
+        if min_sort is None:
+            min_sort = 0
+
         cat = Category(
             name=data['name'],
             type=data['type'],
             default_budget=budget_amount,
             parent_category=parent_category,
-            is_custom=True
+            is_custom=True,
+            sort_order=min_sort - 1
         )
         db.session.add(cat)
         db.session.commit()
@@ -399,7 +416,8 @@ def list_category_groups():
         q = CategoryGroup.query
         if gtype:
             q = q.filter_by(type=gtype)
-        groups = q.order_by(CategoryGroup.name).all()
+        # Return newest groups first so recently added ones appear at the top
+        groups = q.order_by(CategoryGroup.id.desc()).all()
         return jsonify([{"id": g.id, "name": g.name, "type": g.type} for g in groups])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -877,7 +895,12 @@ def withdraw_from_fund(id):
 def get_budget_for_month(year_month):
     try:
         # Build a list of categories with their budgeted amounts
-        cats = Category.query.filter(Category.type.in_(['income','expense','fund'])).all()
+        cats = (
+            Category.query
+            .filter(Category.type.in_(['income', 'expense', 'fund']))
+            .order_by(Category.sort_order, Category.name)
+            .all()
+        )
         resp = []
         
         for c in cats:

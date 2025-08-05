@@ -101,7 +101,8 @@
         });
 
         let html = "";
-        Object.keys(groups).sort().forEach(g => {
+        // Maintain the order provided by the API so new groups appear first
+        Object.keys(groups).forEach(g => {
             const gData = groups[g];
             const safeId = g.replace(/\s+/g, "-");
             const totals = gData.cats.reduce((acc, c) => {
@@ -283,7 +284,14 @@
         const formType = type === 'deduction' ? 'Deduction' : type.charAt(0).toUpperCase() + type.slice(1);
         const el = document.getElementById('add' + formType + 'Form');
         const collapse = bootstrap.Collapse.getOrCreateInstance(el);
+        const isHidden = !el.classList.contains('show');
         collapse.toggle();
+        if (isHidden) {
+            const input = el.querySelector('input[name="name"]');
+            if (input) {
+                input.focus();
+            }
+        }
     }
 
     function showAddCategoryForm(type) {
@@ -291,6 +299,10 @@
         const el = document.getElementById('add' + formType + 'Form');
         const collapse = bootstrap.Collapse.getOrCreateInstance(el);
         collapse.show();
+        const input = el.querySelector('input[name="name"]');
+        if (input) {
+            input.focus();
+        }
     }
 
     function hideAddCategoryForm(type) {
