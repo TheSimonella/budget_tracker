@@ -40,9 +40,6 @@
             <div class="category-remaining text-muted text-end pe-2">Remaining</div>
             <div></div>
         </div>
-        <div id="incomeCategories">
-            <!-- Income categories will be loaded here -->
-        </div>
         <div class="add-category-form collapse" id="addIncomeForm">
             <h6>Add Income Category</h6>
             <form onsubmit="addCategory(event, 'income')">
@@ -59,6 +56,9 @@
                 <button type="submit" class="btn btn-primary">Add Category</button>
                 <button type="button" class="btn btn-secondary" onclick="hideAddCategoryForm('income')">Cancel</button>
             </form>
+        </div>
+        <div id="incomeCategories">
+            <!-- Income categories will be loaded here -->
         </div>
     </div>
 </div>
@@ -84,9 +84,6 @@
             <div class="category-remaining text-muted text-end pe-2">Remaining</div>
             <div></div>
         </div>
-        <div id="deductionCategories">
-            <!-- Deduction categories will be loaded here -->
-        </div>
         <div class="add-category-form collapse" id="addDeductionForm">
             <h6>Add Deduction Category</h6>
             <form onsubmit="addCategory(event, 'deduction')">
@@ -103,6 +100,9 @@
                 <button type="submit" class="btn btn-primary">Add Deduction</button>
                 <button type="button" class="btn btn-secondary" onclick="hideAddCategoryForm('deduction')">Cancel</button>
             </form>
+        </div>
+        <div id="deductionCategories">
+            <!-- Deduction categories will be loaded here -->
         </div>
     </div>
 </div>
@@ -128,9 +128,6 @@
             <div class="category-remaining text-muted text-end pe-2">Remaining</div>
             <div></div>
         </div>
-        <div id="expenseCategories">
-            <!-- Expense categories will be loaded here -->
-        </div>
         <div class="add-category-form collapse" id="addExpenseForm">
             <h6>Add Expense Category</h6>
             <form onsubmit="addCategory(event, 'expense')">
@@ -147,6 +144,9 @@
                 <button type="submit" class="btn btn-primary">Add Category</button>
                 <button type="button" class="btn btn-secondary" onclick="hideAddCategoryForm('expense')">Cancel</button>
             </form>
+        </div>
+        <div id="expenseCategories">
+            <!-- Expense categories will be loaded here -->
         </div>
     </div>
 </div>

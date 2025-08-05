@@ -284,7 +284,15 @@
         const formType = type === 'deduction' ? 'Deduction' : type.charAt(0).toUpperCase() + type.slice(1);
         const el = document.getElementById('add' + formType + 'Form');
         const collapse = bootstrap.Collapse.getOrCreateInstance(el);
+        const isHidden = !el.classList.contains('show');
         collapse.toggle();
+        if (isHidden) {
+            el.scrollIntoView({behavior: 'smooth', block: 'start'});
+            const input = el.querySelector('input[name="name"]');
+            if (input) {
+                input.focus();
+            }
+        }
     }
 
     function showAddCategoryForm(type) {
@@ -292,6 +300,11 @@
         const el = document.getElementById('add' + formType + 'Form');
         const collapse = bootstrap.Collapse.getOrCreateInstance(el);
         collapse.show();
+        el.scrollIntoView({behavior: 'smooth', block: 'start'});
+        const input = el.querySelector('input[name="name"]');
+        if (input) {
+            input.focus();
+        }
     }
 
     function hideAddCategoryForm(type) {
