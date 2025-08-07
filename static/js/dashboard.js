@@ -203,7 +203,7 @@
                     <div class="transaction-details">
                         <div style="font-weight: 500;">${trans.description}</div>
                         <div style="font-size: 0.75rem; color: #6c757d;">
-                            ${trans.category} • ${new Date(trans.date).toLocaleDateString()}
+                            ${trans.category} • ${formatLocalDate(trans.date)}
                         </div>
                     </div>
                     <div class="transaction-amount ${amountClass}">
