@@ -53,9 +53,6 @@
         appearance: textfield;
     }
 
-    [data-theme='dark'] .category-budget .editable-budget {
-        border-color: var(--gray-600);
-    }
 
     .category-budget .editable-budget::-webkit-outer-spin-button,
     .category-budget .editable-budget::-webkit-inner-spin-button {
@@ -139,15 +136,6 @@
         background-color: rgba(108, 117, 125, 0.15);
     }
 
-    [data-theme='dark'] .bg-success-subtle {
-        background-color: rgba(25, 135, 84, 0.35);
-    }
-    [data-theme='dark'] .bg-danger-subtle {
-        background-color: rgba(220, 53, 69, 0.35);
-    }
-    [data-theme='dark'] .bg-secondary-subtle {
-        background-color: rgba(108, 117, 125, 0.35);
-    }
 
     .badge.bg-success-subtle,
     .badge.bg-danger-subtle,
