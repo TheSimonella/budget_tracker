@@ -6,6 +6,7 @@
     let categoryGroups = [];
     let editingCategory = null;
     let editingGroupId = null;
+    let incomeCongratsShown = false;
     $(document).ready(function() {
         $('#monthSelector').val(currentMonth);
         $('#monthSelector').change(function(){
@@ -67,6 +68,7 @@
                 displayCategories(deductionCategories, 'deductionCategories', deductGroups);
                 displayCategories(expenseCategories, 'expenseCategories', getGroups('expense'));
                 displayCategories(fundCategories, 'fundCategories', getGroups('fund'));
+                updateSummary();
             });
         });
     }
@@ -80,7 +82,6 @@
             comparisonData = {};
             data.forEach(item => comparisonData[item.category] = item);
             if (callback) callback();
-            updateSummary();
         });
     }
     
@@ -109,34 +110,42 @@
                 const comp = comparisonData[c.name] || {actual:0};
                 acc.budget += c.monthly_budget || 0;
                 acc.actual += comp.actual;
-                acc.remaining += (c.monthly_budget || 0) - comp.actual;
+                const isIncome = c.type === 'income' && !c.name.toLowerCase().includes('deduction');
+                acc.remaining += isIncome
+                    ? comp.actual - (c.monthly_budget || 0)
+                    : (c.monthly_budget || 0) - comp.actual;
                 return acc;
             }, {budget:0, actual:0, remaining:0});
             const groupNameEsc = g.replace(/'/g, "\\'");
+            const groupRemainClass = totals.remaining > 0 ? 'text-success bg-success-subtle' : totals.remaining < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
             html += `<div class="mb-3 category-group" data-group-id="${gData.id || ''}">
                         <div class="category-item group-header category-grid">
                             <div class="category-toggle"><span class="text-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}"><i class="fas fa-caret-down"></i></span></div>
                             <div class="category-name ${gData.id ? 'editable' : ''}" ${gData.id ? `onclick=\"editGroup(${gData.id}, '${groupNameEsc}')\"` : ''}>${g}</div>
                             <div class="category-budget text-end pe-2">${formatCurrency(totals.budget)}</div>
                             <div class="category-actual text-end pe-2">${formatCurrency(totals.actual)}</div>
-                            <div class="category-remaining text-end pe-2">${formatCurrency(totals.remaining)}</div>
+                            <div class="category-remaining text-end pe-2"><span class="badge fs-6 ${groupRemainClass}">${formatCurrency(totals.remaining)}</span></div>
                             <div class="category-actions"></div>
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
 
             gData.cats.sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
                 const comp = comparisonData[cat.name] || {actual:0};
-                const remaining = cat.monthly_budget - comp.actual;
+                const isIncome = cat.type === 'income' && !cat.name.toLowerCase().includes('deduction');
+                const remaining = isIncome ? comp.actual - cat.monthly_budget : cat.monthly_budget - comp.actual;
                 const pct = cat.monthly_budget ? (comp.actual / cat.monthly_budget) * 100 : (comp.actual > 0 ? 100 : 0);
                 const progPct = Math.min(pct, 100);
-                const barClass = comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger';
+                const barClass = isIncome ?
+                    (comp.actual >= cat.monthly_budget ? 'bg-success' : 'bg-danger') :
+                    (comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger');
+                const remainClass = remaining > 0 ? 'text-success bg-success-subtle' : remaining < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
                 html += `
                     <div class="category-item category-grid" data-id="${cat.id}">
                         <div class="category-toggle"></div>
                         <div class="category-name editable" onclick='editCategory(${JSON.stringify(cat)})'>${cat.name}</div>
                         <div class="category-budget"><input type="number" step="0.01" class="form-control form-control-sm text-end editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
                         <div class="category-actual text-end pe-2">${formatCurrency(comp.actual)}</div>
-                        <div class="category-remaining text-end pe-2">${formatCurrency(remaining)}</div>
+                        <div class="category-remaining text-end pe-2"><span class="badge fs-6 ${remainClass}">${formatCurrency(remaining)}</span></div>
                         <div class="category-actions"></div>
                         <div class="progress category-progress">
                             <div class="progress-bar ${barClass}" style="width:${progPct}%"></div>
@@ -427,19 +436,68 @@
         const totalBudgetExp = expB + fundB + dedB;
         const totalActualExp = expA + fundA + dedA;
         const moneyToBudget = incA - totalActualExp;
-        $('#summaryContent').html(`<p class="fs-4 text-center">${formatCurrency(moneyToBudget)}</p>`);
-        const incPercent = incB ? incA / incB * 100 : 0;
-        const expPercent = totalBudgetExp ? totalActualExp / totalBudgetExp * 100 : 0;
-        const expClass = expPercent <= 100 ? "bg-success" : "bg-danger";
-        $('#incomeSummaryContent').html(`
-            <p>Earned ${formatCurrency(incA)} of ${formatCurrency(incB)}</p>
-            <div class="progress"><div class="progress-bar bg-success" style="width:${Math.min(incPercent,100)}%">${incPercent.toFixed(0)}%</div></div>
-            ${incPercent>100?'<div class="mt-2 text-success">Great job exceeding your goal!</div>':''}
-        `);
-        $('#expenseSummaryContent').html(`
-            <p>Spent ${formatCurrency(totalActualExp)} of ${formatCurrency(totalBudgetExp)}</p>
-            <div class="progress"><div class="progress-bar ${expClass}" style="width:${Math.min(expPercent,100)}%">${expPercent.toFixed(0)}%</div></div>
-        `);
+
+        const moneyClass = moneyToBudget > 0 ? 'text-success bg-success-subtle' : moneyToBudget < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
+        $('#moneyToBudgetAmount').attr('class', `fs-2 fw-bold px-2 py-1 rounded ${moneyClass}`).text(formatCurrency(moneyToBudget));
+
+        const groupTotals = { income:{}, deduction:{}, expense:{}, fund:{} };
+        allCategories.forEach(cat => {
+            const comp = comparisonData[cat.name] || {actual:0};
+            const group = cat.parent_category || 'Other';
+            let bucket;
+            if(cat.type === 'income') {
+                bucket = cat.name.toLowerCase().includes('deduction') ? 'deduction' : 'income';
+            } else if(cat.type === 'fund') { bucket = 'fund'; }
+            else { bucket = 'expense'; }
+            if(!groupTotals[bucket][group]) groupTotals[bucket][group] = {budget:0, actual:0};
+            groupTotals[bucket][group].budget += cat.monthly_budget || 0;
+            groupTotals[bucket][group].actual += comp.actual;
+        });
+
+        function renderGroups(totals, isIncome) {
+            let html = '';
+            Object.entries(totals).forEach(([name, tot]) => {
+                const remaining = isIncome ? tot.actual - tot.budget : tot.budget - tot.actual;
+                const pct = tot.budget ? (tot.actual/tot.budget)*100 : (tot.actual>0?100:0);
+                const barClass = isIncome ? (tot.actual >= tot.budget ? 'bg-success' : 'bg-danger') : (tot.actual <= tot.budget ? 'bg-success' : 'bg-danger');
+                const remClass = remaining > 0 ? 'text-success bg-success-subtle' : remaining < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
+                html += `
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between"><span>${name}</span><span>${formatCurrency(tot.budget)}</span></div>
+                        <div class="progress"><div class="progress-bar ${barClass}" style="width:${Math.min(pct,100)}%"></div></div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span class="fw-bold">${formatCurrency(tot.actual)}</span>
+                            <span class="badge summary-badge ${remClass}">${formatCurrency(remaining)}</span>
+                        </div>
+                    </div>`;
+            });
+            return html;
+        }
+
+        let summaryHtml = '';
+        if(Object.keys(groupTotals.income).length) {
+            summaryHtml += '<h6>Income</h6>' + renderGroups(groupTotals.income, true);
+        }
+        if(Object.keys(groupTotals.deduction).length) {
+            summaryHtml += '<h6 class="mt-3">Deductions</h6>' + renderGroups(groupTotals.deduction, false);
+        }
+        const expGroups = { ...groupTotals.expense, ...groupTotals.fund };
+        if(Object.keys(expGroups).length) {
+            summaryHtml += '<h6 class="mt-3">Expenses</h6>' + renderGroups(expGroups, false);
+        }
+        $('#summaryContent').html(summaryHtml);
+
+        $('#incomeSummaryContent').html(renderGroups(groupTotals.income, true));
+        $('#expenseSummaryContent').html(renderGroups(expGroups, false));
+
+        if (incA > incB) {
+            if (!incomeCongratsShown) {
+                showToast('Fantastic! You earned more than you budgeted. Consider saving or investing the extra income.', 'success');
+                incomeCongratsShown = true;
+            }
+        } else {
+            incomeCongratsShown = false;
+        }
     }
 
     function saveBudget(input) {
