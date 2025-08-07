@@ -117,13 +117,14 @@
                 return acc;
             }, {budget:0, actual:0, remaining:0});
             const groupNameEsc = g.replace(/'/g, "\\'");
+            const groupRemainClass = totals.remaining > 0 ? 'text-bg-success' : totals.remaining < 0 ? 'text-bg-danger' : 'text-bg-secondary';
             html += `<div class="mb-3 category-group" data-group-id="${gData.id || ''}">
                         <div class="category-item group-header category-grid">
                             <div class="category-toggle"><span class="text-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}"><i class="fas fa-caret-down"></i></span></div>
                             <div class="category-name ${gData.id ? 'editable' : ''}" ${gData.id ? `onclick=\"editGroup(${gData.id}, '${groupNameEsc}')\"` : ''}>${g}</div>
                             <div class="category-budget text-end pe-2">${formatCurrency(totals.budget)}</div>
                             <div class="category-actual text-end pe-2">${formatCurrency(totals.actual)}</div>
-                            <div class="category-remaining text-end pe-2">${formatCurrency(totals.remaining)}</div>
+                            <div class="category-remaining text-end pe-2"><span class="badge ${groupRemainClass}">${formatCurrency(totals.remaining)}</span></div>
                             <div class="category-actions"></div>
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
@@ -137,13 +138,14 @@
                 const barClass = isIncome ?
                     (comp.actual >= cat.monthly_budget ? 'bg-success' : 'bg-danger') :
                     (comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger');
+                const remainClass = remaining > 0 ? 'text-bg-success' : remaining < 0 ? 'text-bg-danger' : 'text-bg-secondary';
                 html += `
                     <div class="category-item category-grid" data-id="${cat.id}">
                         <div class="category-toggle"></div>
                         <div class="category-name editable" onclick='editCategory(${JSON.stringify(cat)})'>${cat.name}</div>
                         <div class="category-budget"><input type="number" step="0.01" class="form-control form-control-sm text-end editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
                         <div class="category-actual text-end pe-2">${formatCurrency(comp.actual)}</div>
-                        <div class="category-remaining text-end pe-2">${formatCurrency(remaining)}</div>
+                        <div class="category-remaining text-end pe-2"><span class="badge ${remainClass}">${formatCurrency(remaining)}</span></div>
                         <div class="category-actions"></div>
                         <div class="progress category-progress">
                             <div class="progress-bar ${barClass}" style="width:${progPct}%"></div>
@@ -457,11 +459,18 @@
             summaryHtml += '<h6 class="mt-3">Spending by Group</h6>';
             spentGroups.forEach(([name, tot]) => {
                 const pct = tot.budget ? (tot.actual/tot.budget)*100 : (tot.actual>0?100:0);
+                const remaining = tot.budget - tot.actual;
                 const barClass = tot.actual <= tot.budget ? 'bg-success' : 'bg-danger';
+                const remClass = remaining > 0 ? 'text-success' : remaining < 0 ? 'text-danger' : 'text-muted';
                 summaryHtml += `
                     <div class="mb-2">
                         <div class="d-flex justify-content-between"><span>${name}</span><span>${formatCurrency(tot.actual)} / ${formatCurrency(tot.budget)}</span></div>
                         <div class="progress"><div class="progress-bar ${barClass}" style="width:${Math.min(pct,100)}%"></div></div>
+                        <div class="d-flex justify-content-between small mt-1">
+                            <span>Budgeted: ${formatCurrency(tot.budget)}</span>
+                            <span>Spent: ${formatCurrency(tot.actual)}</span>
+                            <span class="${remClass}">Remaining: ${formatCurrency(remaining)}</span>
+                        </div>
                     </div>`;
             });
         }
@@ -483,10 +492,28 @@
         } else {
             incomeCongratsShown = false;
         }
-        $('#expenseSummaryContent').html(`
+
+        let expenseHtml = `
             <p>Spent ${formatCurrency(totalActualExp)} of ${formatCurrency(totalBudgetExp)}</p>
             <div class="progress"><div class="progress-bar ${expClass}" style="width:${Math.min(expPercent,100)}%">${expPercent.toFixed(0)}%</div></div>
-        `);
+        `;
+        Object.entries(groupTotals).forEach(([name, tot]) => {
+            const pct = tot.budget ? (tot.actual/tot.budget)*100 : (tot.actual>0?100:0);
+            const remaining = tot.budget - tot.actual;
+            const barClass = tot.actual <= tot.budget ? 'bg-success' : 'bg-danger';
+            const remClass = remaining > 0 ? 'text-success' : remaining < 0 ? 'text-danger' : 'text-muted';
+            expenseHtml += `
+                <div class="mt-3 mb-2">
+                    <div class="d-flex justify-content-between"><span>${name}</span><span>${formatCurrency(tot.actual)} / ${formatCurrency(tot.budget)}</span></div>
+                    <div class="progress"><div class="progress-bar ${barClass}" style="width:${Math.min(pct,100)}%"></div></div>
+                    <div class="d-flex justify-content-between small mt-1">
+                        <span>Budgeted: ${formatCurrency(tot.budget)}</span>
+                        <span>Spent: ${formatCurrency(tot.actual)}</span>
+                        <span class="${remClass}">Remaining: ${formatCurrency(remaining)}</span>
+                    </div>
+                </div>`;
+        });
+        $('#expenseSummaryContent').html(expenseHtml);
     }
 
     function saveBudget(input) {
