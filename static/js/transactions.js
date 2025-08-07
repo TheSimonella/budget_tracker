@@ -142,11 +142,95 @@
     function updateCategoryDropdownEdit(transactionType) {
         const select = $('#editTransactionForm select[name="category_id"]');
         select.empty().append('<option value="">Select Category</option>');
-        
+
         // Same logic as updateCategoryDropdown but for edit form
         updateCategoryDropdown.call(this, transactionType);
     }
-    
+
+    function renderTransactionRow(trans) {
+        const isDeduction = trans.type === 'income' && trans.category.toLowerCase().includes('deduction');
+        const typeClass = isDeduction ? 'category-deduction'
+                           : trans.type === 'income' ? 'category-income'
+                           : trans.type === 'expense' ? 'category-expense'
+                           : 'category-fund';
+        let amountClass = 'amount-positive';
+        let amountSign = '+';
+        if (trans.type === 'expense' || trans.type === 'fund_withdrawal') {
+            amountClass = 'amount-negative';
+            amountSign = '-';
+        } else if (isDeduction) {
+            amountClass = 'amount-deduction';
+            amountSign = '-';
+        }
+
+        return `
+            <tr class="transaction-row" data-id="${trans.id}" data-date="${trans.date}">
+                <td>${new Date(trans.date).toLocaleDateString()}</td>
+                <td>
+                    <div class="fw-medium">${trans.description}</div>
+                    ${trans.notes ? `<small class="text-muted">${trans.notes}</small>` : ''}
+                </td>
+                <td><span class="category-pill ${typeClass}">${trans.category}</span></td>
+                <td>${trans.merchant || '-'}</td>
+                <td class="${amountClass} text-end">${amountSign}${formatCurrency(Math.abs(trans.amount))}</td>
+                <td>
+                    <div class="action-buttons text-end">
+                        <button class="btn btn-sm btn-link text-primary p-1" onclick="editTransaction(${trans.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-link text-danger p-1" onclick="deleteTransaction(${trans.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    function shouldDisplayTransaction(trans) {
+        const month = $('#monthSelector').val();
+        const typeFilter = $('#typeFilter').val();
+        const categoryFilter = $('#categoryFilter').val();
+        const searchFilter = $('#searchFilter').val().toLowerCase();
+
+        if (month && trans.date.slice(0, 7) !== month) return false;
+        if (typeFilter && trans.type !== typeFilter) return false;
+        if (categoryFilter && String(trans.category_id) !== categoryFilter) return false;
+        if (searchFilter) {
+            const text = `${trans.description} ${trans.merchant || ''} ${trans.notes || ''}`.toLowerCase();
+            if (!text.includes(searchFilter)) return false;
+        }
+        return true;
+    }
+
+    function checkEmptyState() {
+        const tbody = $('#transactionTableBody');
+        const emptyState = $('#emptyState');
+        if (tbody.children().length === 0) {
+            emptyState.show().html('<i class="fas fa-receipt"></i><h5>No transactions found</h5><p class="mb-0">Try adjusting your filters or add a new transaction.</p>');
+        } else {
+            emptyState.hide();
+        }
+    }
+
+    function insertTransactionRow(trans) {
+        const tbody = $('#transactionTableBody');
+        const row = $(renderTransactionRow(trans));
+        let inserted = false;
+        tbody.children('tr').each(function() {
+            const rowDate = new Date($(this).data('date'));
+            if (new Date(trans.date) > rowDate) {
+                $(this).before(row);
+                inserted = true;
+                return false;
+            }
+        });
+        if (!inserted) {
+            tbody.append(row);
+        }
+        checkEmptyState();
+    }
+
     function loadTransactions() {
         const params = {
             month: $('#monthSelector').val(),
@@ -154,7 +238,7 @@
             category: $('#categoryFilter').val(),
             search: $('#searchFilter').val()
         };
-        
+
         const tbody = $('#transactionTableBody');
         const emptyState = $('#emptyState');
         tbody.empty();
@@ -167,52 +251,11 @@
             }
 
             emptyState.hide();
-            let html = '';
-            
-            transactions.forEach(trans => {
-                const isDeduction = trans.type === 'income' && trans.category.toLowerCase().includes('deduction');
-                const typeClass = isDeduction ? 'category-deduction'
-                                   : trans.type === 'income' ? 'category-income'
-                                   : trans.type === 'expense' ? 'category-expense'
-                                   : 'category-fund';
-                let amountClass = 'amount-positive';
-                let amountSign = '+';
-                if (trans.type === 'expense' || trans.type === 'fund_withdrawal') {
-                    amountClass = 'amount-negative';
-                    amountSign = '-';
-                } else if (isDeduction) {
-                    amountClass = 'amount-deduction';
-                    amountSign = '-';
-                }
-                
-                html += `
-                    <tr class="transaction-row">
-                        <td>${new Date(trans.date).toLocaleDateString()}</td>
-                        <td>
-                            <div class="fw-medium">${trans.description}</div>
-                            ${trans.notes ? `<small class="text-muted">${trans.notes}</small>` : ''}
-                        </td>
-                        <td><span class="category-pill ${typeClass}">${trans.category}</span></td>
-                        <td>${trans.merchant || '-'}</td>
-                        <td class="${amountClass} text-end">${amountSign}${formatCurrency(Math.abs(trans.amount))}</td>
-                        <td>
-                            <div class="action-buttons text-end">
-                                <button class="btn btn-sm btn-link text-primary p-1" onclick="editTransaction(${trans.id})">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn btn-sm btn-link text-danger p-1" onclick="deleteTransaction(${trans.id})">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-            
+            const html = transactions.map(renderTransactionRow).join('');
             tbody.html(html);
         });
     }
-    
+
     function saveTransaction() {
         const button = $('#addTransactionModal .btn-modern-primary');
         const formData = $('#addTransactionForm').serializeArray();
@@ -228,11 +271,29 @@
             method: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(data),
-            success: function() {
+            success: function(res) {
                 $('#addTransactionModal').modal('hide');
                 $('#addTransactionForm')[0].reset();
                 showToast('Transaction added successfully!');
-                loadTransactions();
+                $.get(`/api/transactions/${res.id}`, function(tx) {
+                    const cat = categories.find(c => c.id === tx.category_id);
+                    const trans = {
+                        id: tx.id,
+                        amount: tx.amount,
+                        type: tx.transaction_type,
+                        category: cat ? cat.name : '',
+                        category_id: tx.category_id,
+                        merchant: tx.merchant,
+                        date: tx.date,
+                        description: tx.description,
+                        notes: tx.notes
+                    };
+                    if (shouldDisplayTransaction(trans)) {
+                        insertTransactionRow(trans);
+                    } else {
+                        checkEmptyState();
+                    }
+                });
             },
             error: function(xhr) {
                 const error = xhr.responseJSON?.error || 'Unknown error';
@@ -287,7 +348,25 @@
             success: function() {
                 $('#editTransactionModal').modal('hide');
                 showToast('Transaction updated successfully!');
-                loadTransactions();
+                $.get(`/api/transactions/${editingTransactionId}`, function(tx) {
+                    const cat = categories.find(c => c.id === tx.category_id);
+                    const trans = {
+                        id: tx.id,
+                        amount: tx.amount,
+                        type: tx.transaction_type,
+                        category: cat ? cat.name : '',
+                        category_id: tx.category_id,
+                        merchant: tx.merchant,
+                        date: tx.date,
+                        description: tx.description,
+                        notes: tx.notes
+                    };
+                    $(`tr[data-id="${editingTransactionId}"]`).remove();
+                    if (shouldDisplayTransaction(trans)) {
+                        insertTransactionRow(trans);
+                    }
+                    checkEmptyState();
+                });
             },
             error: function(xhr) {
                 const error = xhr.responseJSON?.error || 'Unknown error';
@@ -298,7 +377,7 @@
             }
         });
     }
-    
+
     function deleteTransaction(id) {
         if (confirm('Are you sure you want to delete this transaction?')) {
             $.ajax({
@@ -306,7 +385,8 @@
                 method: 'DELETE',
                 success: function() {
                     showToast('Transaction deleted successfully!');
-                    loadTransactions();
+                    $(`tr[data-id="${id}"]`).remove();
+                    checkEmptyState();
                 },
                 error: function(xhr) {
                     const error = xhr.responseJSON?.error || 'Unknown error';
