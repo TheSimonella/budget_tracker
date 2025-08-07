@@ -467,7 +467,7 @@
                         <div class="progress"><div class="progress-bar ${barClass}" style="width:${Math.min(pct,100)}%"></div></div>
                         <div class="d-flex justify-content-between mt-1">
                             <span class="fw-bold">${formatCurrency(tot.actual)}</span>
-                            <span class="badge fs-6 ${remClass}">${formatCurrency(remaining)}</span>
+                            <span class="badge summary-badge ${remClass}">${formatCurrency(remaining)}</span>
                         </div>
                     </div>`;
             });

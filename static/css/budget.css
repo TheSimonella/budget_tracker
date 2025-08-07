@@ -125,6 +125,10 @@
         border-radius: 6px;
     }
 
+    .summary-badge {
+        font-size: 1em;
+    }
+
     .bg-success-subtle {
         background-color: rgba(25, 135, 84, 0.15);
     }
