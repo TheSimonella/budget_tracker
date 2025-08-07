@@ -124,7 +124,7 @@
                             <div class="category-name ${gData.id ? 'editable' : ''}" ${gData.id ? `onclick=\"editGroup(${gData.id}, '${groupNameEsc}')\"` : ''}>${g}</div>
                             <div class="category-budget text-end pe-2">${formatCurrency(totals.budget)}</div>
                             <div class="category-actual text-end pe-2">${formatCurrency(totals.actual)}</div>
-                            <div class="category-remaining text-end pe-2"><span class="badge ${groupRemainClass}">${formatCurrency(totals.remaining)}</span></div>
+                            <div class="category-remaining text-end pe-2"><span class="badge fs-6 ${groupRemainClass}">${formatCurrency(totals.remaining)}</span></div>
                             <div class="category-actions"></div>
                         </div>
                         <div id="grp-${containerId}-${safeId}" class="mt-2 collapse show group-categories" data-group="${g}">`;
@@ -145,7 +145,7 @@
                         <div class="category-name editable" onclick='editCategory(${JSON.stringify(cat)})'>${cat.name}</div>
                         <div class="category-budget"><input type="number" step="0.01" class="form-control form-control-sm text-end editable-budget" data-id="${cat.id}" data-name="${cat.name.replace(/'/g, "\\'")}" data-amount="${cat.monthly_budget}" value="${cat.monthly_budget.toFixed(2)}"></div>
                         <div class="category-actual text-end pe-2">${formatCurrency(comp.actual)}</div>
-                        <div class="category-remaining text-end pe-2"><span class="badge ${remainClass}">${formatCurrency(remaining)}</span></div>
+                        <div class="category-remaining text-end pe-2"><span class="badge fs-6 ${remainClass}">${formatCurrency(remaining)}</span></div>
                         <div class="category-actions"></div>
                         <div class="progress category-progress">
                             <div class="progress-bar ${barClass}" style="width:${progPct}%"></div>
@@ -438,7 +438,7 @@
         const moneyToBudget = incA - totalActualExp;
 
         const moneyClass = moneyToBudget > 0 ? 'text-success bg-success-subtle' : moneyToBudget < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
-        $('#moneyToBudgetAmount').attr('class', `fs-2 fw-bold px-2 rounded ${moneyClass}`).text(formatCurrency(moneyToBudget));
+        $('#moneyToBudgetAmount').attr('class', `fs-2 fw-bold px-2 py-1 rounded ${moneyClass}`).text(formatCurrency(moneyToBudget));
 
         const groupTotals = { income:{}, deduction:{}, expense:{}, fund:{} };
         allCategories.forEach(cat => {
@@ -467,7 +467,7 @@
                         <div class="progress"><div class="progress-bar ${barClass}" style="width:${Math.min(pct,100)}%"></div></div>
                         <div class="d-flex justify-content-between mt-1">
                             <span class="fw-bold">${formatCurrency(tot.actual)}</span>
-                            <span class="badge ${remClass}">${formatCurrency(remaining)}</span>
+                            <span class="badge fs-6 ${remClass}">${formatCurrency(remaining)}</span>
                         </div>
                     </div>`;
             });
