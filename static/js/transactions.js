@@ -361,8 +361,18 @@
                         description: tx.description,
                         notes: tx.notes
                     };
-                    $(`tr[data-id="${editingTransactionId}"]`).remove();
-                    if (shouldDisplayTransaction(trans)) {
+                    const row = $(`tr[data-id="${editingTransactionId}"]`);
+                    if (!shouldDisplayTransaction(trans)) {
+                        row.remove();
+                        checkEmptyState();
+                        return;
+                    }
+
+                    const oldDate = row.data('date');
+                    if (oldDate === trans.date) {
+                        row.replaceWith(renderTransactionRow(trans));
+                    } else {
+                        row.remove();
                         insertTransactionRow(trans);
                     }
                     checkEmptyState();
