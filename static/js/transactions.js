@@ -148,13 +148,14 @@
     }
     
     function loadTransactions() {
+        const scrollPosition = window.scrollY;
         const params = {
             month: $('#monthSelector').val(),
             type: $('#typeFilter').val(),
             category: $('#categoryFilter').val(),
             search: $('#searchFilter').val()
         };
-        
+
         const tbody = $('#transactionTableBody');
         const emptyState = $('#emptyState');
         tbody.empty();
@@ -163,12 +164,13 @@
         $.get('/api/transactions', params, function(transactions) {
             if (transactions.length === 0) {
                 emptyState.html('<i class="fas fa-receipt"></i><h5>No transactions found</h5><p class="mb-0">Try adjusting your filters or add a new transaction.</p>');
+                window.scrollTo(0, scrollPosition);
                 return;
             }
 
             emptyState.hide();
             let html = '';
-            
+
             transactions.forEach(trans => {
                 const isDeduction = trans.type === 'income' && trans.category.toLowerCase().includes('deduction');
                 const typeClass = isDeduction ? 'category-deduction'
@@ -184,7 +186,7 @@
                     amountClass = 'amount-deduction';
                     amountSign = '-';
                 }
-                
+
                 html += `
                     <tr class="transaction-row">
                         <td>${new Date(trans.date).toLocaleDateString()}</td>
@@ -208,8 +210,9 @@
                     </tr>
                 `;
             });
-            
+
             tbody.html(html);
+            window.scrollTo(0, scrollPosition);
         });
     }
     
