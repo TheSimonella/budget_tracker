@@ -434,7 +434,38 @@
         const totalBudgetExp = expB + fundB + dedB;
         const totalActualExp = expA + fundA + dedA;
         const moneyToBudget = incA - totalActualExp;
-        $('#summaryContent').html(`<p class="fs-4 text-center">${formatCurrency(moneyToBudget)}</p>`);
+
+        // Build breakdown of expense and fund groups
+        const groupTotals = {};
+        allCategories.filter(c => c.type === 'expense' || c.type === 'fund').forEach(cat => {
+            const group = cat.parent_category || 'Other';
+            const comp = comparisonData[cat.name] || {actual:0};
+            if(!groupTotals[group]) groupTotals[group] = {budget:0, actual:0};
+            groupTotals[group].budget += cat.monthly_budget || 0;
+            groupTotals[group].actual += comp.actual;
+        });
+        const unspent = Object.entries(groupTotals)
+            .filter(([_,tot]) => tot.actual === 0 && tot.budget > 0)
+            .map(([g]) => g);
+        let summaryHtml = `<p class="fs-4 text-center">${formatCurrency(moneyToBudget)}</p>`;
+        if (unspent.length) {
+            summaryHtml += `<p class="mt-3"><strong>Groups with no spending yet:</strong> ${unspent.join(', ')}</p>`;
+        }
+        const spentGroups = Object.entries(groupTotals)
+            .filter(([_,tot]) => tot.actual > 0);
+        if (spentGroups.length) {
+            summaryHtml += '<h6 class="mt-3">Spending by Group</h6>';
+            spentGroups.forEach(([name, tot]) => {
+                const pct = tot.budget ? (tot.actual/tot.budget)*100 : (tot.actual>0?100:0);
+                const barClass = tot.actual <= tot.budget ? 'bg-success' : 'bg-danger';
+                summaryHtml += `
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between"><span>${name}</span><span>${formatCurrency(tot.actual)} / ${formatCurrency(tot.budget)}</span></div>
+                        <div class="progress"><div class="progress-bar ${barClass}" style="width:${Math.min(pct,100)}%"></div></div>
+                    </div>`;
+            });
+        }
+        $('#summaryContent').html(summaryHtml);
         const incPercent = incB ? incA / incB * 100 : 0;
         const expPercent = totalBudgetExp ? totalActualExp / totalBudgetExp * 100 : 0;
         const expClass = expPercent <= 100 ? "bg-success" : "bg-danger";
