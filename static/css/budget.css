@@ -44,12 +44,17 @@
         margin-right: -0.5rem;
         text-align: right;
         border: 1px dashed var(--gray-400);
-        background-color: var(--gray-100);
+        background-color: var(--card-background-color);
+        color: var(--text-color);
         border-radius: 4px;
         padding: 2px 0.5rem;
         box-sizing: border-box;
         -moz-appearance: textfield;
         appearance: textfield;
+    }
+
+    [data-theme='dark'] .category-budget .editable-budget {
+        border-color: var(--gray-600);
     }
 
     .category-budget .editable-budget::-webkit-outer-spin-button,
@@ -112,4 +117,36 @@
     .section-icon {
         width: 24px;
         text-align: center;
+    }
+
+    .category-remaining .badge {
+        padding: 0.25rem 0.5rem;
+        margin-right: -0.5rem;
+        border-radius: 6px;
+    }
+
+    .bg-success-subtle {
+        background-color: rgba(25, 135, 84, 0.15);
+    }
+    .bg-danger-subtle {
+        background-color: rgba(220, 53, 69, 0.15);
+    }
+    .bg-secondary-subtle {
+        background-color: rgba(108, 117, 125, 0.15);
+    }
+
+    [data-theme='dark'] .bg-success-subtle {
+        background-color: rgba(25, 135, 84, 0.35);
+    }
+    [data-theme='dark'] .bg-danger-subtle {
+        background-color: rgba(220, 53, 69, 0.35);
+    }
+    [data-theme='dark'] .bg-secondary-subtle {
+        background-color: rgba(108, 117, 125, 0.35);
+    }
+
+    .badge.bg-success-subtle,
+    .badge.bg-danger-subtle,
+    .badge.bg-secondary-subtle {
+        color: inherit;
     }

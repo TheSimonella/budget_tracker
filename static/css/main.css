@@ -307,3 +307,32 @@ body {
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
+
+        [data-theme='dark'] .btn-light {
+            background-color: var(--gray-700);
+            color: var(--text-color);
+            border-color: var(--gray-600);
+        }
+
+        [data-theme='dark'] .btn-light:hover {
+            background-color: var(--gray-600);
+        }
+
+        [data-theme='dark'] .nav-tabs {
+            border-color: var(--gray-700);
+        }
+
+        [data-theme='dark'] .nav-tabs .nav-link {
+            color: var(--text-color);
+            border-color: var(--gray-700);
+        }
+
+        [data-theme='dark'] .nav-tabs .nav-link.active {
+            background-color: var(--gray-800);
+            border-color: var(--gray-700);
+            color: var(--text-color);
+        }
+
+        [data-theme='dark'] .nav-tabs .nav-link:hover {
+            background-color: var(--gray-800);
+        }
