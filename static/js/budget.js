@@ -6,6 +6,7 @@
     let categoryGroups = [];
     let editingCategory = null;
     let editingGroupId = null;
+    let incomeCongratsShown = false;
     $(document).ready(function() {
         $('#monthSelector').val(currentMonth);
         $('#monthSelector').change(function(){
@@ -109,7 +110,10 @@
                 const comp = comparisonData[c.name] || {actual:0};
                 acc.budget += c.monthly_budget || 0;
                 acc.actual += comp.actual;
-                acc.remaining += (c.monthly_budget || 0) - comp.actual;
+                const isIncome = c.type === 'income' && !c.name.toLowerCase().includes('deduction');
+                acc.remaining += isIncome
+                    ? comp.actual - (c.monthly_budget || 0)
+                    : (c.monthly_budget || 0) - comp.actual;
                 return acc;
             }, {budget:0, actual:0, remaining:0});
             const groupNameEsc = g.replace(/'/g, "\\'");
@@ -126,10 +130,13 @@
 
             gData.cats.sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
                 const comp = comparisonData[cat.name] || {actual:0};
-                const remaining = cat.monthly_budget - comp.actual;
+                const isIncome = cat.type === 'income' && !cat.name.toLowerCase().includes('deduction');
+                const remaining = isIncome ? comp.actual - cat.monthly_budget : cat.monthly_budget - comp.actual;
                 const pct = cat.monthly_budget ? (comp.actual / cat.monthly_budget) * 100 : (comp.actual > 0 ? 100 : 0);
                 const progPct = Math.min(pct, 100);
-                const barClass = comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger';
+                const barClass = isIncome ?
+                    (comp.actual >= cat.monthly_budget ? 'bg-success' : 'bg-danger') :
+                    (comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger');
                 html += `
                     <div class="category-item category-grid" data-id="${cat.id}">
                         <div class="category-toggle"></div>
@@ -431,11 +438,20 @@
         const incPercent = incB ? incA / incB * 100 : 0;
         const expPercent = totalBudgetExp ? totalActualExp / totalBudgetExp * 100 : 0;
         const expClass = expPercent <= 100 ? "bg-success" : "bg-danger";
+        const incClass = incPercent >= 100 ? "bg-success" : "bg-danger";
         $('#incomeSummaryContent').html(`
             <p>Earned ${formatCurrency(incA)} of ${formatCurrency(incB)}</p>
-            <div class="progress"><div class="progress-bar bg-success" style="width:${Math.min(incPercent,100)}%">${incPercent.toFixed(0)}%</div></div>
+            <div class="progress"><div class="progress-bar ${incClass}" style="width:${Math.min(incPercent,100)}%">${incPercent.toFixed(0)}%</div></div>
             ${incPercent>100?'<div class="mt-2 text-success">Great job exceeding your goal!</div>':''}
         `);
+        if (incA > incB) {
+            if (!incomeCongratsShown) {
+                showToast('Fantastic! You earned more than you budgeted. Consider saving or investing the extra income.', 'success');
+                incomeCongratsShown = true;
+            }
+        } else {
+            incomeCongratsShown = false;
+        }
         $('#expenseSummaryContent').html(`
             <p>Spent ${formatCurrency(totalActualExp)} of ${formatCurrency(totalBudgetExp)}</p>
             <div class="progress"><div class="progress-bar ${expClass}" style="width:${Math.min(expPercent,100)}%">${expPercent.toFixed(0)}%</div></div>
