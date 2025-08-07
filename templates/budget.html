@@ -175,6 +175,10 @@
     <div class="col-lg-4" id="summaryColumn">
         <div class="card mb-4">
             <div class="card-body">
+                <div id="moneyToBudgetDisplay" class="text-center mb-3">
+                    <div id="moneyToBudgetAmount" class="fs-2 fw-bold px-2 rounded"></div>
+                    <div class="text-muted small">Left to budget</div>
+                </div>
                 <ul class="nav nav-tabs" id="summaryTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="sum-tab" data-bs-toggle="tab" data-bs-target="#sum" type="button" role="tab">Summary</button>
@@ -186,7 +190,7 @@
                         <button class="nav-link" id="exp-tab" data-bs-toggle="tab" data-bs-target="#expense-summary" type="button" role="tab">Expenses</button>
                     </li>
                 </ul>
-                <div class="tab-content border border-top-0 p-3" id="summaryTabContent">
+                <div class="tab-content border border-top-0 p-3 small" id="summaryTabContent">
                     <div class="tab-pane fade show active" id="sum" role="tabpanel">
                         <div id="summaryContent"></div>
                     </div>
@@ -195,9 +199,11 @@
                     </div>
                     <div class="tab-pane fade" id="expense-summary" role="tabpanel">
                         <div id="expenseSummaryContent"></div>
-</div>
-</div>
-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
 <!-- Edit Category Modal -->
 <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-hidden="true">
