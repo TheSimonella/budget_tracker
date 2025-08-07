@@ -165,7 +165,7 @@
 
         return `
             <tr class="transaction-row" data-id="${trans.id}" data-date="${trans.date}">
-                <td>${new Date(trans.date).toLocaleDateString()}</td>
+                <td>${formatLocalDate(trans.date)}</td>
                 <td>
                     <div class="fw-medium">${trans.description}</div>
                     ${trans.notes ? `<small class="text-muted">${trans.notes}</small>` : ''}
@@ -218,8 +218,8 @@
         const row = $(renderTransactionRow(trans));
         let inserted = false;
         tbody.children('tr').each(function() {
-            const rowDate = new Date($(this).data('date'));
-            if (new Date(trans.date) > rowDate) {
+            const rowDate = parseLocalDate($(this).data('date'));
+            if (parseLocalDate(trans.date) > rowDate) {
                 $(this).before(row);
                 inserted = true;
                 return false;

@@ -44,3 +44,14 @@ function setButtonLoading(button, loading) {
     button.html(button.data('original-text'));
   }
 }
+
+// Parse a YYYY-MM-DD string as a local Date object
+function parseLocalDate(dateString) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+// Format a YYYY-MM-DD string to the user's locale without timezone shift
+function formatLocalDate(dateString) {
+  return parseLocalDate(dateString).toLocaleDateString();
+}
