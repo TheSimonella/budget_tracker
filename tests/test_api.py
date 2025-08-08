@@ -118,11 +118,12 @@ def test_new_category_and_group_at_top(client):
     first = next(c for c in data if c['name'] == 'FirstCat')
     second = next(c for c in data if c['name'] == 'SecondCat')
     assert second['sort_order'] < first['sort_order']
+    assert first['parent_category'] is None and second['parent_category'] is None
 
-    # The default group should be created and listed first
+    # No group should be created automatically
     resp = client.get('/api/category-groups?type=expense')
     groups = resp.get_json()
-    assert groups and groups[0]['name'] == second['parent_category']
+    assert all(g['name'] not in ['FirstCat', 'SecondCat'] for g in groups)
 
     # Add two groups and check that the newest is first
     client.post('/api/category-groups', json={'name': 'GroupA', 'type': 'expense'})

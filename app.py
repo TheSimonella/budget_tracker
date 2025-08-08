@@ -229,24 +229,11 @@ def create_category():
         if not data.get('type'):
             return jsonify({'error': 'Category type is required'}), 400
         
-        # Set default parent category based on type
         parent_category = data.get('parent_category')
-        if not parent_category:
-            if data['type'] == 'income':
-                parent_category = 'Income'
-            elif data['type'] == 'deduction':
-                parent_category = 'Deductions'
-            elif data['type'] == 'expense':
-                parent_category = 'Expenses'
-            elif data['type'] == 'fund':
-                parent_category = 'Savings'
-
-        # Ensure the parent group exists so the category appears at the top
         if parent_category:
             group = CategoryGroup.query.filter_by(name=parent_category, type=data['type']).first()
             if not group:
-                db.session.add(CategoryGroup(name=parent_category, type=data['type']))
-                db.session.flush()
+                return jsonify({'error': 'Group does not exist'}), 400
         
         # Validate budget amount
         budget_amount, error = validate_amount(data.get('monthly_budget', 0))
@@ -359,7 +346,12 @@ def update_category(id):
         if 'name' in data:
             cat.name = data['name']
         if 'parent_category' in data:
-            cat.parent_category = data['parent_category']
+            parent = data['parent_category']
+            if parent:
+                group = CategoryGroup.query.filter_by(name=parent, type=cat.type).first()
+                if not group:
+                    return jsonify({'error': 'Group does not exist'}), 400
+            cat.parent_category = parent
         if 'default_budget' in data:
             amount, error = validate_amount(data['default_budget'])
             if error:
@@ -1569,12 +1561,12 @@ def init_database():
         default_categories = [
             # Income categories
             Category(name='Gross Salary', type='income', parent_category='Income', default_budget=0, is_custom=False),
-            Category(name='401k Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='Health Insurance Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='Federal Tax Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='State Tax Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='Social Security Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
-            Category(name='Medicare Deduction', type='income', parent_category='Deductions', default_budget=0, is_custom=False),
+            Category(name='401k Deduction', type='deduction', parent_category='Deductions', default_budget=0, is_custom=False),
+            Category(name='Health Insurance Deduction', type='deduction', parent_category='Deductions', default_budget=0, is_custom=False),
+            Category(name='Federal Tax Deduction', type='deduction', parent_category='Deductions', default_budget=0, is_custom=False),
+            Category(name='State Tax Deduction', type='deduction', parent_category='Deductions', default_budget=0, is_custom=False),
+            Category(name='Social Security Deduction', type='deduction', parent_category='Deductions', default_budget=0, is_custom=False),
+            Category(name='Medicare Deduction', type='deduction', parent_category='Deductions', default_budget=0, is_custom=False),
             
             # Basic expense categories
             Category(name='Rent/Mortgage', type='expense', parent_category='Housing', default_budget=0, is_custom=False),
@@ -1626,21 +1618,33 @@ def migrate_database():
         if 'is_custom' not in existing_columns:
             print("Adding is_custom column to category table...")
             cursor.execute("ALTER TABLE category ADD COLUMN is_custom BOOLEAN DEFAULT 1")
-            
+
             # Mark default categories
             default_names = [
                 'Gross Salary', '401k Deduction', 'Health Insurance Deduction',
-                'Federal Tax Deduction', 'State Tax Deduction', 
+                'Federal Tax Deduction', 'State Tax Deduction',
                 'Social Security Deduction', 'Medicare Deduction',
                 'Rent/Mortgage', 'Groceries', 'Gas', 'Utilities',
                 'Internet', 'Phone', 'Uncategorized'
             ]
             for name in default_names:
                 cursor.execute("UPDATE category SET is_custom = 0 WHERE name = ?", (name,))
-            
+
             conn.commit()
             print("✓ Database migration completed")
-        
+
+        deduction_names = [
+            '401k Deduction', 'Health Insurance Deduction', 'Federal Tax Deduction',
+            'State Tax Deduction', 'Social Security Deduction', 'Medicare Deduction'
+        ]
+        for name in deduction_names:
+            cursor.execute(
+                "UPDATE category SET type='deduction', parent_category='Deductions'"
+                " WHERE name=? AND type='income'",
+                (name,)
+            )
+        conn.commit()
+
         # Check fund table
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fund'")
         if cursor.fetchone():
