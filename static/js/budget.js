@@ -57,15 +57,13 @@
             $.get(`/api/budget/${currentMonth}`, function(data) {
                 allCategories = data;
 
-                const incomeCategories = data.filter(c => c.type === 'income' && !c.name.toLowerCase().includes('deduction'));
-                const deductionCategories = data.filter(c => c.type === 'income' && c.name.toLowerCase().includes('deduction'));
+                const incomeCategories = data.filter(c => c.type === 'income');
+                const deductionCategories = data.filter(c => c.type === 'deduction');
                 const expenseCategories = data.filter(c => c.type === 'expense');
                 const fundCategories = data.filter(c => c.type === 'fund');
 
-                const incomeGroups = getGroups('income').filter(g => !g.name.toLowerCase().includes('deduct'));
-                const deductGroups = getGroups('income').filter(g => g.name.toLowerCase().includes('deduct'));
-                displayCategories(incomeCategories, 'incomeCategories', incomeGroups);
-                displayCategories(deductionCategories, 'deductionCategories', deductGroups);
+                displayCategories(incomeCategories, 'incomeCategories', getGroups('income'));
+                displayCategories(deductionCategories, 'deductionCategories', getGroups('deduction'));
                 displayCategories(expenseCategories, 'expenseCategories', getGroups('expense'));
                 displayCategories(fundCategories, 'fundCategories', getGroups('fund'));
                 updateSummary();
@@ -110,7 +108,7 @@
                 const comp = comparisonData[c.name] || {actual:0};
                 acc.budget += c.monthly_budget || 0;
                 acc.actual += comp.actual;
-                const isIncome = c.type === 'income' && !c.name.toLowerCase().includes('deduction');
+                const isIncome = c.type === 'income';
                 acc.remaining += isIncome
                     ? comp.actual - (c.monthly_budget || 0)
                     : (c.monthly_budget || 0) - comp.actual;
@@ -131,7 +129,7 @@
 
             gData.cats.sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
                 const comp = comparisonData[cat.name] || {actual:0};
-                const isIncome = cat.type === 'income' && !cat.name.toLowerCase().includes('deduction');
+                const isIncome = cat.type === 'income';
                 const remaining = isIncome ? comp.actual - cat.monthly_budget : cat.monthly_budget - comp.actual;
                 const pct = cat.monthly_budget ? (comp.actual / cat.monthly_budget) * 100 : (comp.actual > 0 ? 100 : 0);
                 const progPct = Math.min(pct, 100);
@@ -160,6 +158,10 @@
 
         container.find('.group-categories').sortable({
             connectWith: '#' + containerId + ' .group-categories',
+            placeholder: 'category-placeholder',
+            forcePlaceholderSize: true,
+            tolerance: 'pointer',
+            dropOnEmpty: true,
             update: function(event, ui) {
                 saveOrder(containerId);
             },
@@ -167,7 +169,10 @@
                 const group = $(this).data('group');
                 const catId = ui.item.data('id');
                 updateCategoryGroup(catId, group);
-            }
+            },
+            over: function(event, ui) { $(this).addClass('drag-over'); },
+            out: function(event, ui) { $(this).removeClass('drag-over'); },
+            deactivate: function(event, ui) { $(this).removeClass('drag-over'); }
         });
     }
 
@@ -328,14 +333,6 @@
         const form = event.target;
         let categoryName = form.name.value;
         let categoryType = type;
-        
-        // For deductions, we store them as income type but with "Deduction" in the name
-        if (type === 'deduction') {
-            categoryType = 'income';
-            if (!categoryName.toLowerCase().includes('deduction')) {
-                categoryName = categoryName + ' Deduction';
-            }
-        }
         const monthlyBudget = parseFloat(form.monthly_budget.value);
 
         $.ajax({
@@ -427,10 +424,9 @@
     function updateSummary() {
         let incB=0, incA=0, dedB=0, dedA=0, expB=0, expA=0, fundB=0, fundA=0;
         Object.values(comparisonData).forEach(item => {
-            if(item.type==='income') {
-                if(item.category.toLowerCase().includes("deduction")) { dedB+=item.budgeted; dedA+=item.actual; }
-                else { incB+=item.budgeted; incA+=item.actual; }
-            } else if(item.type==='expense') { expB+=item.budgeted; expA+=item.actual; }
+            if(item.type==='income') { incB+=item.budgeted; incA+=item.actual; }
+            else if(item.type==='deduction') { dedB+=item.budgeted; dedA+=item.actual; }
+            else if(item.type==='expense') { expB+=item.budgeted; expA+=item.actual; }
             else if(item.type==='fund') { fundB+=item.budgeted; fundA+=item.actual; }
         });
         const totalBudgetExp = expB + fundB + dedB;
@@ -444,11 +440,7 @@
         allCategories.forEach(cat => {
             const comp = comparisonData[cat.name] || {actual:0};
             const group = cat.parent_category || 'Other';
-            let bucket;
-            if(cat.type === 'income') {
-                bucket = cat.name.toLowerCase().includes('deduction') ? 'deduction' : 'income';
-            } else if(cat.type === 'fund') { bucket = 'fund'; }
-            else { bucket = 'expense'; }
+            const bucket = cat.type;
             if(!groupTotals[bucket][group]) groupTotals[bucket][group] = {budget:0, actual:0};
             groupTotals[bucket][group].budget += cat.monthly_budget || 0;
             groupTotals[bucket][group].actual += comp.actual;

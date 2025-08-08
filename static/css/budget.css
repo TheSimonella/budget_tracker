@@ -96,6 +96,22 @@
         height: 4px;
     }
 
+    .group-categories {
+        min-height: 40px;
+        border: 2px dashed transparent;
+        padding: 4px;
+    }
+
+    .group-categories.drag-over {
+        border-color: var(--primary-color);
+    }
+
+    .category-placeholder {
+        border: 2px dashed var(--primary-color);
+        margin-bottom: 10px;
+        height: 40px;
+    }
+
     .category-columns {
         font-weight: 600;
     }

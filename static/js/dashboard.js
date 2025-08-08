@@ -105,24 +105,15 @@
         select.empty().append('<option value="">Select Category</option>');
         
         if (transactionType === 'income') {
-            const incomeCategories = categories.filter(c => c.type === 'income' && !c.name.toLowerCase().includes('deduction'));
-            const deductionCategories = categories.filter(c => c.type === 'income' && c.name.toLowerCase().includes('deduction'));
-            
-            if (incomeCategories.length > 0) {
-                select.append('<optgroup label="Income Sources">');
-                incomeCategories.forEach(cat => {
-                    select.append(`<option value="${cat.id}">${cat.name}</option>`);
-                });
-                select.append('</optgroup>');
-            }
-            
-            if (deductionCategories.length > 0) {
-                select.append('<optgroup label="Deductions">');
-                deductionCategories.forEach(cat => {
-                    select.append(`<option value="${cat.id}">${cat.name}</option>`);
-                });
-                select.append('</optgroup>');
-            }
+            const incomeCategories = categories.filter(c => c.type === 'income');
+            incomeCategories.forEach(cat => {
+                select.append(`<option value="${cat.id}">${cat.name}</option>`);
+            });
+        } else if (transactionType === 'deduction') {
+            const deductionCategories = categories.filter(c => c.type === 'deduction');
+            deductionCategories.forEach(cat => {
+                select.append(`<option value="${cat.id}">${cat.name}</option>`);
+            });
         } else if (transactionType === 'expense') {
             // Group expenses by parent category
             const expensesByParent = {};
@@ -195,8 +186,9 @@
         
         let html = '<div class="p-2">';
         transactions.slice(0, 5).forEach(trans => {
-            const amountClass = trans.type === 'expense' || trans.type === 'fund_withdrawal' ? 'text-danger' : 'text-success';
-            const sign = trans.type === 'expense' || trans.type === 'fund_withdrawal' ? '-' : '+';
+            const isNegative = trans.type === 'expense' || trans.type === 'fund_withdrawal' || trans.type === 'deduction';
+            const amountClass = isNegative ? 'text-danger' : 'text-success';
+            const sign = isNegative ? '-' : '+';
             
             html += `
                 <div class="transaction-item">
@@ -219,8 +211,8 @@
     
     function loadBudgetStatus() {
         $.get(`/api/budget-comparison/${currentMonth}`, function(data) {
-            const overBudget = data.filter(item => item.type === 'expense' && item.status === 'over');
-            const underBudget = data.filter(item => item.type === 'expense' && item.status === 'under');
+            const overBudget = data.filter(item => (item.type === 'expense' || item.type === 'deduction') && item.status === 'over');
+            const underBudget = data.filter(item => (item.type === 'expense' || item.type === 'deduction') && item.status === 'under');
             
             let html = '<div style="font-size: 0.813rem;">';
             

@@ -35,7 +35,7 @@ class CategoryGroup(db.Model):
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
-    type = db.Column(db.String(50), nullable=False)  # 'income', 'expense', 'fund'
+    type = db.Column(db.String(50), nullable=False)  # 'income', 'deduction', 'expense', 'fund'
     default_budget = db.Column(db.Float, default=0.0)
     parent_category = db.Column(db.String(100), nullable=True)
     is_custom = db.Column(db.Boolean, default=True)
@@ -44,7 +44,7 @@ class Category(db.Model):
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     amount = db.Column(db.Float, nullable=False)
-    transaction_type = db.Column(db.String(50), nullable=False)  # 'income', 'expense', 'fund_contribution', 'fund_withdrawal'
+    transaction_type = db.Column(db.String(50), nullable=False)  # 'income', 'deduction', 'expense', 'fund_contribution', 'fund_withdrawal'
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category')
     description = db.Column(db.String(200))
@@ -151,10 +151,8 @@ def get_dashboard_data(year_month):
         ).all()
         
         # Calculate totals
-        gross_income = sum(t.amount for t in transactions 
-                          if t.transaction_type == 'income' and 'deduction' not in t.category.name.lower())
-        deductions = sum(t.amount for t in transactions 
-                        if t.transaction_type == 'income' and 'deduction' in t.category.name.lower())
+        gross_income = sum(t.amount for t in transactions if t.transaction_type == 'income')
+        deductions = sum(t.amount for t in transactions if t.transaction_type == 'deduction')
         net_income = gross_income - deductions
         total_expenses = sum(t.amount for t in transactions if t.transaction_type == 'expense')
         total_savings = sum(t.amount for t in transactions if t.transaction_type == 'fund_contribution')
@@ -235,7 +233,9 @@ def create_category():
         parent_category = data.get('parent_category')
         if not parent_category:
             if data['type'] == 'income':
-                parent_category = 'Income' if 'deduction' not in data['name'].lower() else 'Deductions'
+                parent_category = 'Income'
+            elif data['type'] == 'deduction':
+                parent_category = 'Deductions'
             elif data['type'] == 'expense':
                 parent_category = 'Expenses'
             elif data['type'] == 'fund':
@@ -307,10 +307,8 @@ def get_dashboard_data_annual(year):
             Transaction.date < end_date
         ).all()
 
-        gross_income = sum(t.amount for t in transactions
-                           if t.transaction_type == 'income' and 'deduction' not in t.category.name.lower())
-        deductions = sum(t.amount for t in transactions
-                        if t.transaction_type == 'income' and 'deduction' in t.category.name.lower())
+        gross_income = sum(t.amount for t in transactions if t.transaction_type == 'income')
+        deductions = sum(t.amount for t in transactions if t.transaction_type == 'deduction')
         net_income = gross_income - deductions
         total_expenses = sum(t.amount for t in transactions if t.transaction_type == 'expense')
         total_savings = sum(t.amount for t in transactions if t.transaction_type == 'fund_contribution')
@@ -897,7 +895,7 @@ def get_budget_for_month(year_month):
         # Build a list of categories with their budgeted amounts
         cats = (
             Category.query
-            .filter(Category.type.in_(['income', 'expense', 'fund']))
+            .filter(Category.type.in_(['income', 'deduction', 'expense', 'fund']))
             .order_by(Category.sort_order, Category.name)
             .all()
         )
@@ -965,7 +963,7 @@ def budget_comparison(year_month):
         else:
             end_date = datetime(year, month + 1, 1).date()
         
-        cats = Category.query.filter(Category.type.in_(['income','expense','fund'])).all()
+        cats = Category.query.filter(Category.type.in_(['income','deduction','expense','fund'])).all()
         comparison_data = []
         
         for cat in cats:
@@ -981,6 +979,13 @@ def budget_comparison(year_month):
                     Transaction.date < end_date,
                     Transaction.transaction_type == 'expense'
                 ).scalar() or 0
+            elif cat.type == 'deduction':
+                actual = db.session.query(func.sum(Transaction.amount)).filter(
+                    Transaction.category_id == cat.id,
+                    Transaction.date >= start_date,
+                    Transaction.date < end_date,
+                    Transaction.transaction_type == 'deduction'
+                ).scalar() or 0
             else:
                 actual = db.session.query(func.sum(Transaction.amount)).filter(
                     Transaction.category_id == cat.id,
@@ -989,9 +994,9 @@ def budget_comparison(year_month):
                     Transaction.transaction_type == 'income'
                 ).scalar() or 0
             
-            difference = budget_amount - actual if cat.type in ['expense','fund'] else actual - budget_amount
+            difference = budget_amount - actual if cat.type in ['expense','fund','deduction'] else actual - budget_amount
             percentage = (actual / budget_amount * 100) if budget_amount > 0 else 0
-            
+
             comparison_data.append({
                 'category': cat.name,
                 'type': cat.type,
@@ -999,7 +1004,7 @@ def budget_comparison(year_month):
                 'actual': actual,
                 'difference': difference,
                 'percentage': percentage,
-                'status': 'under' if (cat.type in ['expense','fund'] and actual <= budget_amount) or
+                'status': 'under' if (cat.type in ['expense','fund','deduction'] and actual <= budget_amount) or
                                     (cat.type == 'income' and actual >= budget_amount) else 'over'
             })
         
@@ -1041,10 +1046,9 @@ def get_sankey_data(period, year_month=None):
 
         for t in transactions:
             if t.transaction_type == 'income':
-                if 'deduction' in t.category.name.lower():
-                    deductions[t.category.name] = deductions.get(t.category.name, 0) + t.amount
-                else:
-                    income[t.category.name] = income.get(t.category.name, 0) + t.amount
+                income[t.category.name] = income.get(t.category.name, 0) + t.amount
+            elif t.transaction_type == 'deduction':
+                deductions[t.category.name] = deductions.get(t.category.name, 0) + t.amount
             elif t.transaction_type == 'expense':
                 group = t.category.parent_category or t.category.name
                 expenses[group] = expenses.get(group, 0) + t.amount
@@ -1108,9 +1112,9 @@ def get_monthly_summary_report(year_month):
         # Group by category
         income_by_category = {}
         expense_by_category = {}
-        
+
         for trans in transactions:
-            if trans.transaction_type == 'income':
+            if trans.transaction_type in ['income', 'deduction']:
                 if trans.category.name not in income_by_category:
                     income_by_category[trans.category.name] = 0
                 income_by_category[trans.category.name] += trans.amount
@@ -1121,8 +1125,8 @@ def get_monthly_summary_report(year_month):
                 expense_by_category[parent] += trans.amount
         
         # Calculate totals
-        gross_income = sum(amount for cat, amount in income_by_category.items() if 'deduction' not in cat.lower())
-        deductions = sum(amount for cat, amount in income_by_category.items() if 'deduction' in cat.lower())
+        gross_income = sum(t.amount for t in transactions if t.transaction_type == 'income')
+        deductions = sum(t.amount for t in transactions if t.transaction_type == 'deduction')
         net_income = gross_income - deductions
         total_expenses = sum(expense_by_category.values())
         savings = net_income - total_expenses
@@ -1168,10 +1172,8 @@ def get_annual_overview(year):
                 Transaction.date < end_date
             ).all()
             
-            month_income = sum(t.amount for t in month_transactions 
-                             if t.transaction_type == 'income' and 'deduction' not in t.category.name.lower())
-            month_expenses = sum(t.amount for t in month_transactions 
-                               if t.transaction_type == 'expense')
+            month_income = sum(t.amount for t in month_transactions if t.transaction_type == 'income')
+            month_expenses = sum(t.amount for t in month_transactions if t.transaction_type in ['expense', 'deduction'])
             
             months.append(calendar.month_abbr[month])
             monthly_income.append(month_income)
@@ -1204,7 +1206,7 @@ def get_category_analysis(year_month):
         expenses = Transaction.query.filter(
             Transaction.date >= start_date,
             Transaction.date < end_date,
-            Transaction.transaction_type == 'expense'
+            Transaction.transaction_type.in_(['expense','deduction'])
         ).all()
         
         category_totals = {}
@@ -1263,7 +1265,7 @@ def get_spending_trends():
             month_expenses = db.session.query(func.sum(Transaction.amount)).filter(
                 Transaction.date >= month_start,
                 Transaction.date < month_end,
-                Transaction.transaction_type == 'expense'
+                Transaction.transaction_type.in_(['expense','deduction'])
             ).scalar() or 0
 
             months.append(f"{calendar.month_abbr[current.month]} {current.year}")
@@ -1320,7 +1322,7 @@ def period_comparison():
                 month_total = db.session.query(func.sum(Transaction.amount)).filter(
                     Transaction.date >= current,
                     Transaction.date < next_month,
-                    Transaction.transaction_type == 'expense'
+                    Transaction.transaction_type.in_(['expense','deduction'])
                 ).scalar() or 0
                 months.append(f"{calendar.month_abbr[current.month]} {current.year}")
                 totals.append(month_total)
