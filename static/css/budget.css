@@ -112,6 +112,16 @@
         height: 40px;
     }
 
+    .group-placeholder {
+        border: 2px dashed var(--primary-color);
+        margin-bottom: 10px;
+        height: 50px;
+    }
+
+    .group-header {
+        cursor: move;
+    }
+
     .category-columns {
         font-weight: 600;
     }

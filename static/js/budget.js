@@ -91,18 +91,28 @@
             return;
         }
 
-        const groups = {};
-        groupObjs.forEach(g => groups[g.name] = { id: g.id, cats: [] });
+        const groupsMap = new Map();
+        const orderedGroups = [];
+
+        groupObjs.forEach(g => {
+            const obj = { name: g.name, id: g.id, cats: [] };
+            groupsMap.set(g.name, obj);
+            orderedGroups.push(obj);
+        });
+
         categories.forEach(cat => {
             const group = cat.parent_category || 'Other';
-            if (!groups[group]) groups[group] = { id: null, cats: [] };
-            groups[group].cats.push(cat);
+            if (!groupsMap.has(group)) {
+                const obj = { name: group, id: null, cats: [] };
+                groupsMap.set(group, obj);
+                orderedGroups.push(obj);
+            }
+            groupsMap.get(group).cats.push(cat);
         });
 
         let html = "";
-        // Maintain the order provided by the API so new groups appear first
-        Object.keys(groups).forEach(g => {
-            const gData = groups[g];
+        orderedGroups.forEach(gData => {
+            const g = gData.name;
             const safeId = g.replace(/\s+/g, "-");
             const totals = gData.cats.reduce((acc, c) => {
                 const comp = comparisonData[c.name] || {actual:0};
@@ -174,6 +184,15 @@
             out: function(event, ui) { $(this).removeClass('drag-over'); },
             deactivate: function(event, ui) { $(this).removeClass('drag-over'); }
         });
+
+        container.sortable({
+            items: '> .category-group',
+            handle: '.group-header',
+            placeholder: 'group-placeholder',
+            update: function(event, ui) {
+                saveGroupOrder(containerId);
+            }
+        });
     }
 
     function saveOrder(containerId) {
@@ -192,6 +211,26 @@
             error: function(xhr) {
                 const error = xhr.responseJSON?.error || 'Unknown error';
                 showToast('Error saving order: ' + error, 'error');
+            }
+        });
+    }
+
+    function saveGroupOrder(containerId) {
+        const order = [];
+        $('#' + containerId + ' .category-group').each(function(i, el) {
+            const id = $(el).data('group-id');
+            if (id) {
+                order.push({id: id, sort_order: order.length});
+            }
+        });
+        $.ajax({
+            url: '/api/category-groups/reorder',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({order: order}),
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Unknown error';
+                showToast('Error saving group order: ' + error, 'error');
             }
         });
     }

@@ -131,3 +131,13 @@ def test_new_category_and_group_at_top(client):
     resp = client.get('/api/category-groups?type=expense')
     groups = resp.get_json()
     assert groups[0]['name'] == 'GroupB'
+
+    id_a = next(g['id'] for g in groups if g['name'] == 'GroupA')
+    id_b = next(g['id'] for g in groups if g['name'] == 'GroupB')
+    client.post('/api/category-groups/reorder', json={'order': [
+        {'id': id_a, 'sort_order': 0},
+        {'id': id_b, 'sort_order': 1}
+    ]})
+    resp = client.get('/api/category-groups?type=expense')
+    groups = resp.get_json()
+    assert groups[0]['name'] == 'GroupA'

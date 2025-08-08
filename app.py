@@ -30,6 +30,7 @@ class CategoryGroup(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     type = db.Column(db.String(50), nullable=False)
+    sort_order = db.Column(db.Integer, default=0)
     __table_args__ = (db.UniqueConstraint("name", "type"),)
 
 class Category(db.Model):
@@ -406,9 +407,11 @@ def list_category_groups():
         q = CategoryGroup.query
         if gtype:
             q = q.filter_by(type=gtype)
-        # Return newest groups first so recently added ones appear at the top
-        groups = q.order_by(CategoryGroup.id.desc()).all()
-        return jsonify([{"id": g.id, "name": g.name, "type": g.type} for g in groups])
+        groups = q.order_by(CategoryGroup.sort_order, CategoryGroup.id).all()
+        return jsonify([
+            {"id": g.id, "name": g.name, "type": g.type, "sort_order": g.sort_order}
+            for g in groups
+        ])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -421,7 +424,10 @@ def create_category_group():
         existing = CategoryGroup.query.filter_by(name=data["name"], type=data["type"]).first()
         if existing:
             return jsonify({"error": "Group already exists"}), 400
-        g = CategoryGroup(name=data["name"], type=data["type"])
+        min_sort = db.session.query(func.min(CategoryGroup.sort_order)).filter_by(type=data["type"]).scalar()
+        if min_sort is None:
+            min_sort = 0
+        g = CategoryGroup(name=data["name"], type=data["type"], sort_order=min_sort - 1)
         db.session.add(g)
         db.session.commit()
         return jsonify({"id": g.id, "message": "Group created"})
@@ -460,6 +466,21 @@ def delete_category_group(group_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/category-groups/reorder', methods=['POST'])
+def reorder_category_groups():
+    try:
+        order_data = request.json.get('order', [])
+        for item in order_data:
+            grp = CategoryGroup.query.get(item['id'])
+            if grp:
+                grp.sort_order = int(item.get('sort_order', 0))
+        db.session.commit()
+        return jsonify({'message': 'Order updated'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 ####
@@ -1592,9 +1613,11 @@ def init_database():
 def init_groups():
     if CategoryGroup.query.first() is None:
         groups = Category.query.with_entities(Category.parent_category, Category.type).distinct().all()
+        order = 0
         for name, typ in groups:
             if name:
-                db.session.add(CategoryGroup(name=name, type=typ))
+                db.session.add(CategoryGroup(name=name, type=typ, sort_order=order))
+                order += 1
         db.session.commit()
 
 # Database migration function
@@ -1632,6 +1655,14 @@ def migrate_database():
 
             conn.commit()
             print("✓ Database migration completed")
+
+        # Check for missing columns in category_group table
+        cursor.execute("PRAGMA table_info(category_group)")
+        group_columns = [column[1] for column in cursor.fetchall()]
+        if 'sort_order' not in group_columns:
+            cursor.execute("ALTER TABLE category_group ADD COLUMN sort_order INTEGER DEFAULT 0")
+            conn.commit()
+            print("✓ Added sort_order column to category_group table")
 
         deduction_names = [
             '401k Deduction', 'Health Insurance Deduction', 'Federal Tax Deduction',
