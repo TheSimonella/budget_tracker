@@ -98,24 +98,15 @@
         select.empty().append('<option value="">Select Category</option>');
         
         if (transactionType === 'income') {
-            const incomeCategories = categories.filter(c => c.type === 'income' && !c.name.toLowerCase().includes('deduction'));
-            const deductionCategories = categories.filter(c => c.type === 'income' && c.name.toLowerCase().includes('deduction'));
-            
-            if (incomeCategories.length > 0) {
-                select.append('<optgroup label="Income Sources">');
-                incomeCategories.forEach(cat => {
-                    select.append(`<option value="${cat.id}">${cat.name}</option>`);
-                });
-                select.append('</optgroup>');
-            }
-            
-            if (deductionCategories.length > 0) {
-                select.append('<optgroup label="Deductions">');
-                deductionCategories.forEach(cat => {
-                    select.append(`<option value="${cat.id}">${cat.name}</option>`);
-                });
-                select.append('</optgroup>');
-            }
+            const incomeCategories = categories.filter(c => c.type === 'income');
+            incomeCategories.forEach(cat => {
+                select.append(`<option value="${cat.id}">${cat.name}</option>`);
+            });
+        } else if (transactionType === 'deduction') {
+            const deductionCategories = categories.filter(c => c.type === 'deduction');
+            deductionCategories.forEach(cat => {
+                select.append(`<option value="${cat.id}">${cat.name}</option>`);
+            });
         } else if (transactionType === 'expense') {
             const grouped = {};
             categories.filter(c => c.type === 'expense' || c.type === 'fund').forEach(cat => {
@@ -148,18 +139,15 @@
     }
 
     function renderTransactionRow(trans) {
-        const isDeduction = trans.type === 'income' && trans.category.toLowerCase().includes('deduction');
+        const isDeduction = trans.type === 'deduction';
         const typeClass = isDeduction ? 'category-deduction'
                            : trans.type === 'income' ? 'category-income'
                            : trans.type === 'expense' ? 'category-expense'
                            : 'category-fund';
         let amountClass = 'amount-positive';
         let amountSign = '+';
-        if (trans.type === 'expense' || trans.type === 'fund_withdrawal') {
-            amountClass = 'amount-negative';
-            amountSign = '-';
-        } else if (isDeduction) {
-            amountClass = 'amount-deduction';
+        if (trans.type === 'expense' || trans.type === 'fund_withdrawal' || isDeduction) {
+            amountClass = isDeduction ? 'amount-deduction' : 'amount-negative';
             amountSign = '-';
         }
 
