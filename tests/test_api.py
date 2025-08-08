@@ -141,3 +141,23 @@ def test_new_category_and_group_at_top(client):
     resp = client.get('/api/category-groups?type=expense')
     groups = resp.get_json()
     assert groups[0]['name'] == 'GroupA'
+
+
+def test_move_category_between_groups(client):
+    # create two groups
+    client.post('/api/category-groups', json={'name': 'MoveA', 'type': 'expense'})
+    client.post('/api/category-groups', json={'name': 'MoveB', 'type': 'expense'})
+
+    # create category assigned to first group
+    resp = client.post('/api/categories', json={'name': 'Movable', 'type': 'expense', 'parent_category': 'MoveA'})
+    cat_id = resp.get_json()['id']
+
+    # move category to second group
+    resp = client.put(f'/api/categories/{cat_id}', json={'parent_category': 'MoveB'})
+    assert resp.status_code == 200
+
+    # verify parent_category updated
+    resp = client.get('/api/budget/2023-01')
+    data = resp.get_json()
+    moved = next(c for c in data if c['id'] == cat_id)
+    assert moved['parent_category'] == 'MoveB'

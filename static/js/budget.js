@@ -168,11 +168,12 @@
 
         container.find('.group-categories').sortable({
             connectWith: '#' + containerId + ' .group-categories',
+            items: '> .category-item',
             placeholder: 'category-placeholder',
             forcePlaceholderSize: true,
             tolerance: 'pointer',
             dropOnEmpty: true,
-            update: function(event, ui) {
+            stop: function(event, ui) {
                 saveOrder(containerId);
             },
             receive: function(event, ui) {
@@ -189,6 +190,7 @@
             items: '> .category-group',
             handle: '.group-header',
             placeholder: 'group-placeholder',
+            cancel: '.group-categories, .group-categories *',
             update: function(event, ui) {
                 saveGroupOrder(containerId);
             }
