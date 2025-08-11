@@ -566,16 +566,19 @@ def create_transaction():
             notes=data.get('notes', '')
         )
         
-        # Update fund balance for contributions or withdrawals
-        if category.type == 'fund':
+        # If it's an expense to a fund category, update the fund balance
+        if tx.transaction_type == 'expense' and category.type == 'fund':
             fund = Fund.query.filter_by(name=category.name).first()
             if fund:
-                if tx.transaction_type in ['expense', 'fund_contribution']:
-                    fund.current_balance += tx.amount
-                elif tx.transaction_type == 'fund_withdrawal':
-                    if fund.current_balance < tx.amount:
-                        return jsonify({'error': 'Insufficient fund balance'}), 400
-                    fund.current_balance -= tx.amount
+                fund.current_balance += tx.amount
+
+        # Handle fund withdrawals
+        elif tx.transaction_type == 'fund_withdrawal' and category.type == 'fund':
+            fund = Fund.query.filter_by(name=category.name).first()
+            if fund:
+                if fund.current_balance < tx.amount:
+                    return jsonify({'error': 'Insufficient fund balance'}), 400
+                fund.current_balance -= tx.amount
         
         db.session.add(tx)
         db.session.commit()
@@ -624,14 +627,12 @@ def update_transaction(id):
             date_obj = tx.date
         
         # Rollback previous fund effect
-        prev_category = tx.category
-        if prev_category and prev_category.type == 'fund':
-            prev_fund = Fund.query.filter_by(name=prev_category.name).first()
+        if tx.transaction_type in ['fund_contribution', 'fund_withdrawal']:
+            prev_fund = Fund.query.filter_by(name=tx.category.name).first()
             if prev_fund:
-                if tx.transaction_type in ['expense', 'fund_contribution']:
-                    # previous transaction was a fund contribution
+                if tx.transaction_type == 'fund_contribution':
                     prev_fund.current_balance -= tx.amount
-                elif tx.transaction_type == 'fund_withdrawal':
+                else:
                     prev_fund.current_balance += tx.amount
         
         # Apply updates
@@ -642,15 +643,14 @@ def update_transaction(id):
         tx.merchant = data.get('merchant', tx.merchant)
         tx.date = date_obj
         tx.notes = data.get('notes', tx.notes)
-
+        
         # Apply new fund effect
-        new_category = Category.query.get(tx.category_id)
-        if new_category and new_category.type == 'fund':
-            new_fund = Fund.query.filter_by(name=new_category.name).first()
+        if tx.transaction_type in ['fund_contribution', 'fund_withdrawal']:
+            new_fund = Fund.query.filter_by(name=tx.category.name).first()
             if new_fund:
-                if tx.transaction_type in ['expense', 'fund_contribution']:
+                if tx.transaction_type == 'fund_contribution':
                     new_fund.current_balance += tx.amount
-                elif tx.transaction_type == 'fund_withdrawal':
+                else:
                     if new_fund.current_balance < tx.amount:
                         db.session.rollback()
                         return jsonify({'error': 'Insufficient fund balance'}), 400
@@ -667,13 +667,12 @@ def delete_transaction(id):
     try:
         tx = Transaction.query.get_or_404(id)
         # Rollback fund if needed
-        if tx.category.type == 'fund':
+        if tx.transaction_type in ['fund_contribution', 'fund_withdrawal']:
             f = Fund.query.filter_by(name=tx.category.name).first()
             if f:
-                if tx.transaction_type in ['expense', 'fund_contribution']:
-                    # deleting a fund contribution
+                if tx.transaction_type == 'fund_contribution':
                     f.current_balance -= tx.amount
-                elif tx.transaction_type == 'fund_withdrawal':
+                else:
                     f.current_balance += tx.amount
         db.session.delete(tx)
         db.session.commit()
