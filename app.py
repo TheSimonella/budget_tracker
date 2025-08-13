@@ -566,19 +566,16 @@ def create_transaction():
             notes=data.get('notes', '')
         )
         
-        # If it's an expense to a fund category, update the fund balance
-        if tx.transaction_type == 'expense' and category.type == 'fund':
+        # Update fund balance for contributions or withdrawals
+        if category.type == 'fund':
             fund = Fund.query.filter_by(name=category.name).first()
             if fund:
-                fund.current_balance += tx.amount
-
-        # Handle fund withdrawals
-        elif tx.transaction_type == 'fund_withdrawal' and category.type == 'fund':
-            fund = Fund.query.filter_by(name=category.name).first()
-            if fund:
-                if fund.current_balance < tx.amount:
-                    return jsonify({'error': 'Insufficient fund balance'}), 400
-                fund.current_balance -= tx.amount
+                if tx.transaction_type in ['expense', 'fund_contribution']:
+                    fund.current_balance += tx.amount
+                elif tx.transaction_type == 'fund_withdrawal':
+                    if fund.current_balance < tx.amount:
+                        return jsonify({'error': 'Insufficient fund balance'}), 400
+                    fund.current_balance -= tx.amount
         
         db.session.add(tx)
         db.session.commit()
@@ -627,12 +624,14 @@ def update_transaction(id):
             date_obj = tx.date
         
         # Rollback previous fund effect
-        if tx.transaction_type in ['fund_contribution', 'fund_withdrawal']:
-            prev_fund = Fund.query.filter_by(name=tx.category.name).first()
+        prev_category = tx.category
+        if prev_category and prev_category.type == 'fund':
+            prev_fund = Fund.query.filter_by(name=prev_category.name).first()
             if prev_fund:
-                if tx.transaction_type == 'fund_contribution':
+                if tx.transaction_type in ['expense', 'fund_contribution']:
+                    # previous transaction was a fund contribution
                     prev_fund.current_balance -= tx.amount
-                else:
+                elif tx.transaction_type == 'fund_withdrawal':
                     prev_fund.current_balance += tx.amount
         
         # Apply updates
@@ -643,14 +642,15 @@ def update_transaction(id):
         tx.merchant = data.get('merchant', tx.merchant)
         tx.date = date_obj
         tx.notes = data.get('notes', tx.notes)
-        
+
         # Apply new fund effect
-        if tx.transaction_type in ['fund_contribution', 'fund_withdrawal']:
-            new_fund = Fund.query.filter_by(name=tx.category.name).first()
+        new_category = Category.query.get(tx.category_id)
+        if new_category and new_category.type == 'fund':
+            new_fund = Fund.query.filter_by(name=new_category.name).first()
             if new_fund:
-                if tx.transaction_type == 'fund_contribution':
+                if tx.transaction_type in ['expense', 'fund_contribution']:
                     new_fund.current_balance += tx.amount
-                else:
+                elif tx.transaction_type == 'fund_withdrawal':
                     if new_fund.current_balance < tx.amount:
                         db.session.rollback()
                         return jsonify({'error': 'Insufficient fund balance'}), 400
@@ -667,12 +667,13 @@ def delete_transaction(id):
     try:
         tx = Transaction.query.get_or_404(id)
         # Rollback fund if needed
-        if tx.transaction_type in ['fund_contribution', 'fund_withdrawal']:
+        if tx.category.type == 'fund':
             f = Fund.query.filter_by(name=tx.category.name).first()
             if f:
-                if tx.transaction_type == 'fund_contribution':
+                if tx.transaction_type in ['expense', 'fund_contribution']:
+                    # deleting a fund contribution
                     f.current_balance -= tx.amount
-                else:
+                elif tx.transaction_type == 'fund_withdrawal':
                     f.current_balance += tx.amount
         db.session.delete(tx)
         db.session.commit()
@@ -899,6 +900,29 @@ def withdraw_from_fund(id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/funds/refresh', methods=['POST'])
+def refresh_funds():
+    try:
+        funds = Fund.query.all()
+        for fund in funds:
+            category = Category.query.filter_by(name=fund.name, type='fund').first()
+            if not category:
+                continue
+            contributions = db.session.query(func.sum(Transaction.amount)).filter(
+                Transaction.category_id == category.id,
+                Transaction.transaction_type.in_(['fund_contribution', 'expense'])
+            ).scalar() or 0
+            withdrawals = db.session.query(func.sum(Transaction.amount)).filter(
+                Transaction.category_id == category.id,
+                Transaction.transaction_type == 'fund_withdrawal'
+            ).scalar() or 0
+            fund.current_balance = contributions - withdrawals
+        db.session.commit()
+        return jsonify({'message': 'Funds refreshed successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 ####
 # API: Budget & Comparison
 ####
@@ -1053,7 +1077,7 @@ def get_sankey_data(period, year_month=None):
         ).all()
 
         income = {}
-        deductions = {}
+        deduction_total = 0
         expenses = {}
         savings = {}
 
@@ -1061,10 +1085,9 @@ def get_sankey_data(period, year_month=None):
             if t.transaction_type == 'income':
                 income[t.category.name] = income.get(t.category.name, 0) + t.amount
             elif t.transaction_type == 'deduction':
-                deductions[t.category.name] = deductions.get(t.category.name, 0) + t.amount
+                deduction_total += t.amount
             elif t.transaction_type == 'expense':
-                group = t.category.parent_category or t.category.name
-                expenses[group] = expenses.get(group, 0) + t.amount
+                expenses[t.category.name] = expenses.get(t.category.name, 0) + t.amount
             elif t.transaction_type == 'fund_contribution':
                 savings[t.category.name] = savings.get(t.category.name, 0) + t.amount
 
@@ -1080,15 +1103,15 @@ def get_sankey_data(period, year_month=None):
             nodes.append({'name': cat, 'type': 'income'})
             links.append({'source': node_map[cat], 'target': node_map['Budget'], 'value': amt})
 
-        for cat, amt in deductions.items():
-            node_map[cat] = len(nodes)
-            nodes.append({'name': cat, 'type': 'deduction'})
-            links.append({'source': node_map['Budget'], 'target': node_map[cat], 'value': amt})
+        if deduction_total > 0:
+            node_map['Deductions'] = len(nodes)
+            nodes.append({'name': 'Deductions', 'type': 'deduction'})
+            links.append({'source': node_map['Budget'], 'target': node_map['Deductions'], 'value': deduction_total})
 
-        for grp, amt in expenses.items():
-            node_map[grp] = len(nodes)
-            nodes.append({'name': grp, 'type': 'expense'})
-            links.append({'source': node_map['Budget'], 'target': node_map[grp], 'value': amt})
+        for cat, amt in expenses.items():
+            node_map[cat] = len(nodes)
+            nodes.append({'name': cat, 'type': 'expense'})
+            links.append({'source': node_map['Budget'], 'target': node_map[cat], 'value': amt})
 
         for fund, amt in savings.items():
             node_map[fund] = len(nodes)
