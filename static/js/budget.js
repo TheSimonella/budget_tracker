@@ -85,6 +85,7 @@
     
     function displayCategories(categories, containerId, groupObjs = []) {
         const container = $('#' + containerId);
+        const categoryType = categories.length ? categories[0].type : null;
 
         if (categories.length === 0 && groupObjs.length === 0) {
             container.html('<p class="text-muted">No categories added yet. Click "Add" to create your first category.</p>');
@@ -125,7 +126,11 @@
                 return acc;
             }, {budget:0, actual:0, remaining:0});
             const groupNameEsc = g.replace(/'/g, "\\'");
-            const groupRemainClass = totals.remaining > 0 ? 'text-success bg-success-subtle' : totals.remaining < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
+            const groupRemainClass = totals.remaining > 0
+                ? (categoryType === 'fund' ? 'text-danger bg-danger-subtle' : 'text-success bg-success-subtle')
+                : totals.remaining < 0
+                    ? (categoryType === 'fund' ? 'text-success bg-success-subtle' : 'text-danger bg-danger-subtle')
+                    : 'text-secondary bg-secondary-subtle';
             html += `<div class="mb-3 category-group" data-group-id="${gData.id || ''}">
                         <div class="category-item group-header category-grid">
                             <div class="category-toggle"><span class="text-secondary group-toggle" data-bs-toggle="collapse" data-bs-target="#grp-${containerId}-${safeId}"><i class="fas fa-caret-down"></i></span></div>
@@ -140,13 +145,23 @@
             gData.cats.sort((a,b)=>a.sort_order-b.sort_order).forEach(cat => {
                 const comp = comparisonData[cat.name] || {actual:0};
                 const isIncome = cat.type === 'income';
-                const remaining = isIncome ? comp.actual - cat.monthly_budget : cat.monthly_budget - comp.actual;
+                const isFund = cat.type === 'fund';
+                let remaining, barClass, remainClass;
+                if (isIncome) {
+                    remaining = comp.actual - cat.monthly_budget;
+                    barClass = comp.actual >= cat.monthly_budget ? 'bg-success' : 'bg-danger';
+                    remainClass = remaining >= 0 ? 'text-success bg-success-subtle' : 'text-danger bg-danger-subtle';
+                } else if (isFund) {
+                    remaining = cat.monthly_budget - comp.actual;
+                    barClass = comp.actual >= cat.monthly_budget ? 'bg-success' : 'bg-danger';
+                    remainClass = remaining > 0 ? 'text-danger bg-danger-subtle' : 'text-success bg-success-subtle';
+                } else {
+                    remaining = cat.monthly_budget - comp.actual;
+                    barClass = comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger';
+                    remainClass = remaining > 0 ? 'text-success bg-success-subtle' : remaining < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
+                }
                 const pct = cat.monthly_budget ? (comp.actual / cat.monthly_budget) * 100 : (comp.actual > 0 ? 100 : 0);
                 const progPct = Math.min(pct, 100);
-                const barClass = isIncome ?
-                    (comp.actual >= cat.monthly_budget ? 'bg-success' : 'bg-danger') :
-                    (comp.actual <= cat.monthly_budget ? 'bg-success' : 'bg-danger');
-                const remainClass = remaining > 0 ? 'text-success bg-success-subtle' : remaining < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
                 html += `
                     <div class="category-item category-grid" data-id="${cat.id}">
                         <div class="category-toggle"></div>
@@ -487,13 +502,24 @@
             groupTotals[bucket][group].actual += comp.actual;
         });
 
-        function renderGroups(totals, isIncome) {
+        function renderGroups(totals, type) {
             let html = '';
             Object.entries(totals).forEach(([name, tot]) => {
+                const isIncome = type === 'income';
+                const isFund = type === 'fund';
                 const remaining = isIncome ? tot.actual - tot.budget : tot.budget - tot.actual;
                 const pct = tot.budget ? (tot.actual/tot.budget)*100 : (tot.actual>0?100:0);
-                const barClass = isIncome ? (tot.actual >= tot.budget ? 'bg-success' : 'bg-danger') : (tot.actual <= tot.budget ? 'bg-success' : 'bg-danger');
-                const remClass = remaining > 0 ? 'text-success bg-success-subtle' : remaining < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
+                let barClass, remClass;
+                if (isIncome) {
+                    barClass = tot.actual >= tot.budget ? 'bg-success' : 'bg-danger';
+                    remClass = remaining >= 0 ? 'text-success bg-success-subtle' : 'text-danger bg-danger-subtle';
+                } else if (isFund) {
+                    barClass = tot.actual >= tot.budget ? 'bg-success' : 'bg-danger';
+                    remClass = remaining > 0 ? 'text-danger bg-danger-subtle' : 'text-success bg-success-subtle';
+                } else {
+                    barClass = tot.actual <= tot.budget ? 'bg-success' : 'bg-danger';
+                    remClass = remaining > 0 ? 'text-success bg-success-subtle' : remaining < 0 ? 'text-danger bg-danger-subtle' : 'text-secondary bg-secondary-subtle';
+                }
                 html += `
                     <div class="mb-2">
                         <div class="d-flex justify-content-between"><span>${name}</span><span>${formatCurrency(tot.budget)}</span></div>
@@ -509,19 +535,21 @@
 
         let summaryHtml = '';
         if(Object.keys(groupTotals.income).length) {
-            summaryHtml += '<h6>Income</h6>' + renderGroups(groupTotals.income, true);
+            summaryHtml += '<h6>Income</h6>' + renderGroups(groupTotals.income, 'income');
         }
         if(Object.keys(groupTotals.deduction).length) {
-            summaryHtml += '<h6 class="mt-3">Deductions</h6>' + renderGroups(groupTotals.deduction, false);
+            summaryHtml += '<h6 class="mt-3">Deductions</h6>' + renderGroups(groupTotals.deduction, 'deduction');
         }
-        const expGroups = { ...groupTotals.expense, ...groupTotals.fund };
-        if(Object.keys(expGroups).length) {
-            summaryHtml += '<h6 class="mt-3">Expenses</h6>' + renderGroups(expGroups, false);
+        if(Object.keys(groupTotals.expense).length) {
+            summaryHtml += '<h6 class="mt-3">Expenses</h6>' + renderGroups(groupTotals.expense, 'expense');
+        }
+        if(Object.keys(groupTotals.fund).length) {
+            summaryHtml += '<h6 class="mt-3">Funds</h6>' + renderGroups(groupTotals.fund, 'fund');
         }
         $('#summaryContent').html(summaryHtml);
 
-        $('#incomeSummaryContent').html(renderGroups(groupTotals.income, true));
-        $('#expenseSummaryContent').html(renderGroups(expGroups, false));
+        $('#incomeSummaryContent').html(renderGroups(groupTotals.income, 'income'));
+        $('#expenseSummaryContent').html(renderGroups(groupTotals.expense, 'expense') + renderGroups(groupTotals.fund, 'fund'));
 
         if (incA > incB) {
             if (!incomeCongratsShown) {

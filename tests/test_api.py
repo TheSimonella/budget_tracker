@@ -161,3 +161,82 @@ def test_move_category_between_groups(client):
     data = resp.get_json()
     moved = next(c for c in data if c['id'] == cat_id)
     assert moved['parent_category'] == 'MoveB'
+
+
+def test_edit_delete_fund_contribution_updates_balance(client):
+    # create a fund which also creates a corresponding category
+    resp = client.post('/api/funds', json={'name': 'Car Fund'})
+    assert resp.status_code == 200
+
+    # find the category id for the fund
+    resp = client.get('/api/categories')
+    cat_id = next(c['id'] for c in resp.get_json() if c['name'] == 'Car Fund')
+
+    # add a contribution transaction (expense in fund category)
+    tx_data = {
+        'amount': '100',
+        'transaction_type': 'expense',
+        'category_id': cat_id,
+        'date': '2023-01-01'
+    }
+    resp = client.post('/api/transactions', json=tx_data)
+    assert resp.status_code == 200
+    tx_id = resp.get_json()['id']
+
+    # verify fund balance increased
+    resp = client.get('/api/funds')
+    fund = next(f for f in resp.get_json() if f['name'] == 'Car Fund')
+    assert fund['balance'] == 100
+
+    # update the transaction amount
+    resp = client.put(f'/api/transactions/{tx_id}', json={'amount': '150'})
+    assert resp.status_code == 200
+
+    # balance should reflect the new amount
+    resp = client.get('/api/funds')
+    fund = next(f for f in resp.get_json() if f['name'] == 'Car Fund')
+    assert fund['balance'] == 150
+
+    # delete the transaction and ensure balance resets
+    resp = client.delete(f'/api/transactions/{tx_id}')
+    assert resp.status_code == 200
+
+    resp = client.get('/api/funds')
+    fund = next(f for f in resp.get_json() if f['name'] == 'Car Fund')
+    assert fund['balance'] == 0
+
+
+def test_refresh_funds_recalculates_balance(client):
+    # create fund and associated category
+    resp = client.post('/api/funds', json={'name': 'Emergency Fund'})
+    assert resp.status_code == 200
+
+    # get category id
+    resp = client.get('/api/categories')
+    cat_id = next(c['id'] for c in resp.get_json() if c['name'] == 'Emergency Fund')
+
+    # add contribution transaction
+    tx_data = {
+        'amount': '200',
+        'transaction_type': 'expense',
+        'category_id': cat_id,
+        'date': '2023-01-01'
+    }
+    resp = client.post('/api/transactions', json=tx_data)
+    assert resp.status_code == 200
+
+    # manually corrupt balance
+    from app import Fund, db
+    with client.application.app_context():
+        fund = Fund.query.filter_by(name='Emergency Fund').first()
+        fund.current_balance = 0
+        db.session.commit()
+
+    # refresh funds to recalc balances
+    resp = client.post('/api/funds/refresh')
+    assert resp.status_code == 200
+
+    # verify balance recalculated
+    resp = client.get('/api/funds')
+    fund = next(f for f in resp.get_json() if f['name'] == 'Emergency Fund')
+    assert fund['balance'] == 200
