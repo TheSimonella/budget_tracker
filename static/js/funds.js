@@ -217,3 +217,13 @@
             });
         }
     }
+
+    function refreshFunds() {
+        $.post('/api/funds/refresh', function() {
+            showToast('Funds refreshed successfully!', 'success');
+            loadFunds();
+        }).fail(function(xhr) {
+            const error = xhr.responseJSON?.error || 'Unknown error';
+            showToast('Error refreshing funds: ' + error, 'error');
+        });
+    }
