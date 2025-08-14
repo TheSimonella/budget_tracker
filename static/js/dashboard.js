@@ -306,11 +306,17 @@
             .append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
+        const typeOrder = { deduction: 0, fund: 1, expense: 2, income: 3, other: 4 };
+
         const sankey = d3.sankey()
             .nodeWidth(15)
-            .nodePadding(10)
-            .nodeAlign(d3.sankeyJustify)
-            .nodeSort(null)
+            .nodePadding(20)
+            .nodeAlign(d3.sankeyCenter)
+            .nodeSort((a, b) => {
+                const ta = typeOrder[a.type] ?? 99;
+                const tb = typeOrder[b.type] ?? 99;
+                return ta - tb || d3.ascending(a.name, b.name);
+            })
             .linkSort(null)
             .extent([[0, 0], [width, height]]);
 
@@ -353,7 +359,7 @@
                 if (targetType === "fund") return "#28a745";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => Math.max(1, d.width))
+            .attr("stroke-width", d => Math.max(2, d.width * 1.5))
             .attr("fill", "none")
             .attr("opacity", 0.5);
         
