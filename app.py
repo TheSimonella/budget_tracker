@@ -1110,32 +1110,34 @@ def get_sankey_data(period, year_month=None):
         links = []
         node_map = {}
 
-        node_map['Budget'] = len(nodes)
-        nodes.append({'name': 'Budget', 'type': 'budget'})
+        def add_node(key, name, ntype):
+            node_map[key] = len(nodes)
+            nodes.append({'name': name, 'type': ntype})
+
+        add_node('budget', 'Budget', 'budget')
 
         for cat, amt in income.items():
-            node_map[cat] = len(nodes)
-            nodes.append({'name': cat, 'type': 'income'})
-            links.append({'source': node_map[cat], 'target': node_map['Budget'], 'value': amt})
+            add_node(f'income:{cat}', cat, 'income')
+            links.append({'source': node_map[f'income:{cat}'], 'target': node_map['budget'], 'value': amt})
 
         if deduction_total > 0:
-            node_map['Deductions'] = len(nodes)
-            nodes.append({'name': 'Deductions', 'type': 'deduction'})
-            links.append({'source': node_map['Budget'], 'target': node_map['Deductions'], 'value': deduction_total})
+            add_node('deductions', 'Deductions', 'deduction')
+            links.append({'source': node_map['budget'], 'target': node_map['deductions'], 'value': deduction_total})
+
         for grp, amt in expense_groups.items():
-            node_map[grp] = len(nodes)
-            nodes.append({'name': grp, 'type': 'expense'})
-            links.append({'source': node_map['Budget'], 'target': node_map[grp], 'value': amt})
+            grp_key = f'group:{grp}'
+            add_node(grp_key, grp, 'expense')
+            links.append({'source': node_map['budget'], 'target': node_map[grp_key], 'value': amt})
             if grp in expense_categories:
                 for cat, camt in expense_categories[grp].items():
-                    node_map[cat] = len(nodes)
-                    nodes.append({'name': cat, 'type': 'expense'})
-                    links.append({'source': node_map[grp], 'target': node_map[cat], 'value': camt})
+                    cat_key = f'cat:{grp}:{cat}'
+                    add_node(cat_key, cat, 'expense')
+                    links.append({'source': node_map[grp_key], 'target': node_map[cat_key], 'value': camt})
 
         for fund, amt in savings.items():
-            node_map[fund] = len(nodes)
-            nodes.append({'name': fund, 'type': 'fund'})
-            links.append({'source': node_map['Budget'], 'target': node_map[fund], 'value': amt})
+            fund_key = f'fund:{fund}'
+            add_node(fund_key, fund, 'fund')
+            links.append({'source': node_map['budget'], 'target': node_map[fund_key], 'value': amt})
 
         return jsonify({'nodes': nodes, 'links': links})
     except Exception as e:

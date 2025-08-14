@@ -307,8 +307,8 @@
             .attr("transform", `translate(${margin.left},${margin.top})`);
         
         const sankey = d3.sankey()
-            .nodeWidth(20)
-            .nodePadding(20)
+            .nodeWidth(15)
+            .nodePadding(24)
             .nodeAlign(d3.sankeyCenter)
             .nodeSort(null)
             .linkSort(null)
@@ -341,7 +341,7 @@
                 if (targetType === "fund") return "#2a9d8f";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => Math.max(3, d.width * 1.5))
+            .attr("stroke-width", d => d.width * 5)
             .attr("fill", "none")
             .attr("opacity", 0.6);
         
