@@ -339,7 +339,7 @@
                 if (targetType === "fund") return "#2a9d8f";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => Math.max(2, d.width * 1.5))
+            .attr("stroke-width", d => Math.max(4, d.width * 4))
             .attr("fill", "none")
             .attr("opacity", 0.5);
         
