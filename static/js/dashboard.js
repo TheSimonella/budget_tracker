@@ -122,7 +122,7 @@
                 if (!expensesByParent[parent]) expensesByParent[parent] = [];
                 expensesByParent[parent].push(cat);
             });
-            
+
             Object.keys(expensesByParent).sort().forEach(parent => {
                 select.append(`<optgroup label="${parent}">`);
                 expensesByParent[parent].forEach(cat => {
@@ -130,8 +130,8 @@
                 });
                 select.append('</optgroup>');
             });
-        } else if (transactionType === 'fund_withdrawal') {
-            const fundCategories = categories.filter(c => c.parent_category === 'Savings');
+        } else if (transactionType === 'fund_contribution' || transactionType === 'fund_withdrawal') {
+            const fundCategories = categories.filter(c => c.type === 'fund');
             fundCategories.forEach(cat => {
                 select.append(`<option value="${cat.id}">${cat.name}</option>`);
             });
@@ -295,9 +295,9 @@
             return;
         }
         
-        const margin = {top: 10, right: 10, bottom: 10, left: 10};
+        const margin = {top: 40, right: 10, bottom: 40, left: 10};
         const width = $("#sankeyDiagram").width() - margin.left - margin.right;
-        const height = 330 - margin.top - margin.bottom;
+        const height = Math.max(400, data.nodes.length * 30) - margin.top - margin.bottom;
         
         const svg = d3.select("#sankeyDiagram")
             .append("svg")
@@ -308,7 +308,7 @@
         
         const sankey = d3.sankey()
             .nodeWidth(15)
-            .nodePadding(10)
+            .nodePadding(20)
             .extent([[0, 0], [width, height]]);
         
         const {nodes, links} = sankey(data);

@@ -122,7 +122,7 @@
                 });
                 select.append('</optgroup>');
             });
-        } else if (transactionType === 'fund_withdrawal') {
+        } else if (transactionType === 'fund_contribution' || transactionType === 'fund_withdrawal') {
             const fundCategories = categories.filter(c => c.parent_category === 'Savings');
             fundCategories.forEach(cat => {
                 select.append(`<option value="${cat.id}">${cat.name}</option>`);
@@ -140,13 +140,13 @@
 
     function renderTransactionRow(trans) {
         const isDeduction = trans.type === 'deduction';
-        const typeClass = isDeduction ? 'category-deduction'
-                           : trans.type === 'income' ? 'category-income'
-                           : trans.type === 'expense' ? 'category-expense'
-                           : 'category-fund';
+        const typeClass = trans.category_type === 'income' ? 'category-income'
+                           : trans.category_type === 'deduction' ? 'category-deduction'
+                           : trans.category_type === 'fund' ? 'category-fund'
+                           : 'category-expense';
         let amountClass = 'amount-positive';
         let amountSign = '+';
-        if (trans.type === 'expense' || trans.type === 'fund_withdrawal' || isDeduction) {
+        if (trans.type === 'expense' || trans.type === 'fund_withdrawal' || trans.type === 'fund_contribution' || isDeduction || trans.category_type === 'fund') {
             amountClass = isDeduction ? 'amount-deduction' : 'amount-negative';
             amountSign = '-';
         }
@@ -271,6 +271,7 @@
                         type: tx.transaction_type,
                         category: cat ? cat.name : '',
                         category_id: tx.category_id,
+                        category_type: cat ? cat.type : '',
                         merchant: tx.merchant,
                         date: tx.date,
                         description: tx.description,
@@ -344,6 +345,7 @@
                         type: tx.transaction_type,
                         category: cat ? cat.name : '',
                         category_id: tx.category_id,
+                        category_type: cat ? cat.type : '',
                         merchant: tx.merchant,
                         date: tx.date,
                         description: tx.description,
