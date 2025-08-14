@@ -1118,8 +1118,12 @@ def get_sankey_data(period, year_month=None):
             node_map[key] = len(nodes)
             nodes.append({'name': name, 'type': ntype})
 
-        # Single income source
+        # Income sources and aggregated Income node
         add_node('income', 'Income', 'income')
+        for src, amt in income.items():
+            src_key = f'income:{src}'
+            add_node(src_key, src, 'income')
+            links.append({'source': node_map[src_key], 'target': node_map['income'], 'value': amt})
 
         # Deductions from income
         if deduction_total > 0:

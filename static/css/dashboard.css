@@ -39,13 +39,14 @@
     
     /* Sankey Diagram */
     .sankey-container {
-        width: 100vw;
-        margin-left: calc(50% - 50vw);
+        width: 100%;
+        margin: 0 auto;
     }
 
     #sankeyDiagram {
         width: 100%;
         height: 350px;
+        margin: 0 auto;
     }
     
     /* Expandable Content */

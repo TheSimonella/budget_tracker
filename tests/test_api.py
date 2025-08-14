@@ -275,6 +275,7 @@ def test_sankey_data_money_flow(client):
                 return l['value']
         return None
 
+    assert link_value('Gross Salary', 'Income') == 100
     assert link_value('Income', 'Deductions') == 20
     assert link_value('Income', 'Food') == 30
     assert link_value('Income', 'Transportation') == 10
