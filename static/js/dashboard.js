@@ -326,19 +326,31 @@
             return 'other';
         }
 
-        // Center income nodes vertically
-        const incomeNodes = nodes.filter(n => getNodeType(n) === 'income' && n.x0 === 0);
-        if (incomeNodes.length) {
-            const minY = d3.min(incomeNodes, n => n.y0);
-            const maxY = d3.max(incomeNodes, n => n.y1);
-            const blockHeight = maxY - minY;
-            const offset = (height - blockHeight) / 2 - minY;
-            incomeNodes.forEach(n => {
-                n.y0 += offset;
-                n.y1 += offset;
-            });
-            sankey.update({nodes, links});
+        // Center specified sets of nodes vertically
+        function centerNodes(filterFn) {
+            const columnNodes = nodes.filter(filterFn);
+            if (columnNodes.length) {
+                const minY = d3.min(columnNodes, n => n.y0);
+                const maxY = d3.max(columnNodes, n => n.y1);
+                const blockHeight = maxY - minY;
+                const offset = (height - blockHeight) / 2 - minY;
+                columnNodes.forEach(n => {
+                    n.y0 += offset;
+                    n.y1 += offset;
+                });
+            }
         }
+
+        centerNodes(n => getNodeType(n) === 'income' && n.x0 === 0);
+        centerNodes(n => getNodeType(n) === 'budget');
+        centerNodes(n => getNodeType(n) === 'group');
+        sankey.update({nodes, links});
+
+        // Scale link widths to show relative money flow
+        const maxValue = d3.max(links, d => d.value);
+        const linkWidth = d3.scaleLinear()
+            .domain([0, maxValue])
+            .range([4, 40]);
 
         // Add links
         svg.append("g")
@@ -353,7 +365,7 @@
                 if (targetType === "fund") return "#2a9d8f";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => Math.max(12, d.width * 12))
+            .attr("stroke-width", d => linkWidth(d.value))
             .attr("fill", "none")
             .attr("opacity", 0.5);
         
