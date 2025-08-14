@@ -40,7 +40,7 @@
     /* Sankey Diagram */
     #sankeyDiagram {
         width: 100%;
-        min-height: 400px;
+        height: 350px;
     }
     
     /* Expandable Content */

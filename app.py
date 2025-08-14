@@ -1080,60 +1080,48 @@ def get_sankey_data(period, year_month=None):
             Transaction.date < end_date
         ).all()
 
-        # Aggregate values
-        income_totals = {}
-        deduction_totals = {}
-        expense_totals = {}
+        income = {}
+        deductions = {}
+        expenses = {}
+        savings = {}
 
         for t in transactions:
-            cat = t.category
-            cat_name = cat.name
-
             if t.transaction_type == 'income':
-                income_totals[cat_name] = income_totals.get(cat_name, 0) + t.amount
+                income[t.category.name] = income.get(t.category.name, 0) + t.amount
             elif t.transaction_type == 'deduction':
-                deduction_totals[cat_name] = deduction_totals.get(cat_name, 0) + t.amount
-            elif t.transaction_type in ['expense', 'fund_contribution']:
-                group = cat.parent_category or 'Other'
-                if group not in expense_totals:
-                    expense_totals[group] = {}
-                if cat_name not in expense_totals[group]:
-                    cat_type = 'fund' if cat.type == 'fund' or t.transaction_type == 'fund_contribution' else 'expense'
-                    expense_totals[group][cat_name] = {'value': 0, 'type': cat_type}
-                expense_totals[group][cat_name]['value'] += t.amount
+                deductions[t.category.name] = deductions.get(t.category.name, 0) + t.amount
+            elif t.transaction_type == 'expense':
+                group = t.category.parent_category or t.category.name
+                expenses[group] = expenses.get(group, 0) + t.amount
+            elif t.transaction_type == 'fund_contribution':
+                savings[t.category.name] = savings.get(t.category.name, 0) + t.amount
 
-        nodes = [{'name': 'Budget', 'type': 'budget'}]
+        nodes = []
         links = []
-        node_map = {'Budget': 0}
+        node_map = {}
 
-        # Income nodes
-        for name, total in income_totals.items():
-            node_map[name] = len(nodes)
-            nodes.append({'name': name, 'type': 'income'})
-            links.append({'source': node_map[name], 'target': node_map['Budget'], 'value': total})
+        node_map['Budget'] = len(nodes)
+        nodes.append({'name': 'Budget', 'type': 'budget'})
 
-        # Deduction nodes
-        if deduction_totals:
-            node_map['Deductions'] = len(nodes)
-            nodes.append({'name': 'Deductions', 'type': 'deduction'})
-            total_deductions = sum(deduction_totals.values())
-            links.append({'source': node_map['Budget'], 'target': node_map['Deductions'], 'value': total_deductions})
-            for name, total in deduction_totals.items():
-                node_map[name] = len(nodes)
-                nodes.append({'name': name, 'type': 'deduction'})
-                links.append({'source': node_map['Deductions'], 'target': node_map[name], 'value': total})
+        for cat, amt in income.items():
+            node_map[cat] = len(nodes)
+            nodes.append({'name': cat, 'type': 'income'})
+            links.append({'source': node_map[cat], 'target': node_map['Budget'], 'value': amt})
 
-        # Expense and fund nodes grouped
-        for group in sorted(expense_totals.keys()):
-            group_key = f'group_{group}'
-            node_map[group_key] = len(nodes)
-            nodes.append({'name': group, 'type': 'group'})
-            group_total = sum(info['value'] for info in expense_totals[group].values())
-            links.append({'source': node_map['Budget'], 'target': node_map[group_key], 'value': group_total})
-            for cat_name, info in expense_totals[group].items():
-                node_map[cat_name] = len(nodes)
-                nodes.append({'name': cat_name, 'type': info['type']})
-                links.append({'source': node_map[group_key], 'target': node_map[cat_name], 'value': info['value']})
+        for cat, amt in deductions.items():
+            node_map[cat] = len(nodes)
+            nodes.append({'name': cat, 'type': 'deduction'})
+            links.append({'source': node_map['Budget'], 'target': node_map[cat], 'value': amt})
+
+        for grp, amt in expenses.items():
+            node_map[grp] = len(nodes)
+            nodes.append({'name': grp, 'type': 'expense'})
+            links.append({'source': node_map['Budget'], 'target': node_map[grp], 'value': amt})
+
+        for fund, amt in savings.items():
+            node_map[fund] = len(nodes)
+            nodes.append({'name': fund, 'type': 'fund'})
+            links.append({'source': node_map['Budget'], 'target': node_map[fund], 'value': amt})
 
         return jsonify({'nodes': nodes, 'links': links})
     except Exception as e:

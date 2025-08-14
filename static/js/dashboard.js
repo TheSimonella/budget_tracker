@@ -295,9 +295,9 @@
             return;
         }
         
-        const margin = {top: 40, right: 10, bottom: 40, left: 10};
+        const margin = {top: 10, right: 10, bottom: 10, left: 10};
         const width = $("#sankeyDiagram").width() - margin.left - margin.right;
-        const height = Math.min(Math.max(500, data.nodes.length * 36), 900) - margin.top - margin.bottom;
+        const height = 330 - margin.top - margin.bottom;
         
         const svg = d3.select("#sankeyDiagram")
             .append("svg")
@@ -308,8 +308,7 @@
         
         const sankey = d3.sankey()
             .nodeWidth(15)
-            .nodePadding(40)
-            .nodeSort(null)
+            .nodePadding(10)
             .extent([[0, 0], [width, height]]);
 
         const {nodes, links} = sankey(data);
@@ -326,32 +325,6 @@
             return 'other';
         }
 
-        // Center specified sets of nodes vertically
-        function centerNodes(filterFn) {
-            const columnNodes = nodes.filter(filterFn);
-            if (columnNodes.length) {
-                const minY = d3.min(columnNodes, n => n.y0);
-                const maxY = d3.max(columnNodes, n => n.y1);
-                const blockHeight = maxY - minY;
-                const offset = (height - blockHeight) / 2 - minY;
-                columnNodes.forEach(n => {
-                    n.y0 += offset;
-                    n.y1 += offset;
-                });
-            }
-        }
-
-        centerNodes(n => getNodeType(n) === 'income' && n.x0 === 0);
-        centerNodes(n => getNodeType(n) === 'budget');
-        centerNodes(n => getNodeType(n) === 'group');
-        sankey.update({nodes, links});
-
-        // Scale link widths to show relative money flow
-        const maxValue = d3.max(links, d => d.value);
-        const linkWidth = d3.scaleLinear()
-            .domain([0, maxValue])
-            .range([4, 40]);
-
         // Add links
         svg.append("g")
             .selectAll("path")
@@ -365,7 +338,7 @@
                 if (targetType === "fund") return "#2a9d8f";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => linkWidth(d.value))
+            .attr("stroke-width", d => Math.max(1, d.width))
             .attr("fill", "none")
             .attr("opacity", 0.5);
         
