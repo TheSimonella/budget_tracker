@@ -314,7 +314,20 @@
             .linkSort(null)
             .extent([[0, 0], [width, height]]);
 
-        const {nodes, links} = sankey(data);
+        const graph = sankey(data);
+
+        // Center graph vertically so flows expand evenly up and down
+        const yExtent = d3.extent(graph.nodes.flatMap(n => [n.y0, n.y1]));
+        const offset = (height - (yExtent[1] - yExtent[0])) / 2;
+        if (offset > 0) {
+            graph.nodes.forEach(n => {
+                n.y0 += offset;
+                n.y1 += offset;
+            });
+            sankey.update(graph);
+        }
+
+        const {nodes, links} = graph;
 
         // Determine node type for coloring
         function getNodeType(node) {
