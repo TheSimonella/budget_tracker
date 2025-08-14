@@ -311,7 +311,7 @@
             .nodePadding(40)
             .nodeSort(null)
             .extent([[0, 0], [width, height]]);
-        
+
         const {nodes, links} = sankey(data);
 
         // Determine node type for coloring
@@ -325,7 +325,21 @@
             if (name === 'Budget') return 'budget';
             return 'other';
         }
-        
+
+        // Center income nodes vertically
+        const incomeNodes = nodes.filter(n => getNodeType(n) === 'income' && n.x0 === 0);
+        if (incomeNodes.length) {
+            const minY = d3.min(incomeNodes, n => n.y0);
+            const maxY = d3.max(incomeNodes, n => n.y1);
+            const blockHeight = maxY - minY;
+            const offset = (height - blockHeight) / 2 - minY;
+            incomeNodes.forEach(n => {
+                n.y0 += offset;
+                n.y1 += offset;
+            });
+            sankey.update({nodes, links});
+        }
+
         // Add links
         svg.append("g")
             .selectAll("path")
@@ -339,7 +353,7 @@
                 if (targetType === "fund") return "#2a9d8f";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => Math.max(4, d.width * 4))
+            .attr("stroke-width", d => Math.max(12, d.width * 12))
             .attr("fill", "none")
             .attr("opacity", 0.5);
         
