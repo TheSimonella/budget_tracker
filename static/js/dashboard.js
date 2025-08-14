@@ -307,12 +307,11 @@
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
         const sankey = d3.sankey()
-            .nodeWidth(20)
-            .nodePadding(36)
+            .nodeWidth(15)
+            .nodePadding(10)
             .nodeAlign(d3.sankeyJustify)
             .nodeSort(null)
             .linkSort(null)
-            .iterations(64)
             .extent([[0, 0], [width, height]]);
 
         const {nodes, links} = sankey(data);
@@ -338,12 +337,12 @@
                 const targetType = getNodeType(d.target);
                 if (targetType === "deduction") return "#f77f00";
                 if (targetType === "expense") return "#dc3545";
-                if (targetType === "fund") return "#2a9d8f";
+                if (targetType === "fund") return "#28a745";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => Math.max(2, d.width * 8))
+            .attr("stroke-width", d => Math.max(1, d.width))
             .attr("fill", "none")
-            .attr("opacity", 0.6);
+            .attr("opacity", 0.5);
         
         // Add nodes
         const node = svg.append("g")
@@ -361,7 +360,7 @@
                 if (type === "income") return "#4361ee";
                 if (type === "deduction") return "#f77f00";
                 if (type === "expense") return "#dc3545";
-                if (type === "fund") return "#2a9d8f";
+                if (type === "fund") return "#28a745";
                 return "#6c757d";
             });
         
