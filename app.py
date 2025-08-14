@@ -1061,79 +1061,79 @@ def budget_comparison(year_month):
 @app.route('/api/sankey-data/<period>/<year_month>')
 def get_sankey_data(period, year_month=None):
     try:
-        # If no year_month provided, use current month
         if year_month is None:
             now = datetime.now()
             year = now.year
             month = now.month
         else:
             year, month = map(int, year_month.split('-'))
-        
+
         if period == 'monthly':
             start_date = datetime(year, month, 1).date()
-            if month == 12:
-                end_date = datetime(year + 1, 1, 1).date()
-            else:
-                end_date = datetime(year, month + 1, 1).date()
+            end_date = datetime(year + (month // 12), ((month % 12) + 1), 1).date()
         else:  # annual
             start_date = datetime(year, 1, 1).date()
             end_date = datetime(year + 1, 1, 1).date()
-        
+
         transactions = Transaction.query.filter(
             Transaction.date >= start_date,
             Transaction.date < end_date
         ).all()
 
-        nodes = []
-        links = []
-        node_map = {}
-
-        # Central budget node
-        node_map['Budget'] = len(nodes)
-        nodes.append({'name': 'Budget', 'type': 'budget'})
+        # Aggregate values
+        income_totals = {}
+        deduction_totals = {}
+        expense_totals = {}
 
         for t in transactions:
             cat = t.category
             cat_name = cat.name
 
             if t.transaction_type == 'income':
-                if cat_name not in node_map:
-                    node_map[cat_name] = len(nodes)
-                    nodes.append({'name': cat_name, 'type': 'income'})
-                links.append({'source': node_map[cat_name], 'target': node_map['Budget'], 'value': t.amount})
-
+                income_totals[cat_name] = income_totals.get(cat_name, 0) + t.amount
             elif t.transaction_type == 'deduction':
-                group_key = 'group_deductions'
-                if group_key not in node_map:
-                    node_map[group_key] = len(nodes)
-                    nodes.append({'name': 'Deductions', 'type': 'deduction'})
-
-                if cat_name not in node_map:
-                    node_map[cat_name] = len(nodes)
-                    nodes.append({'name': cat_name, 'type': 'deduction'})
-
-                links.append({'source': node_map['Budget'], 'target': node_map[group_key], 'value': t.amount})
-                links.append({'source': node_map[group_key], 'target': node_map[cat_name], 'value': t.amount})
-
+                deduction_totals[cat_name] = deduction_totals.get(cat_name, 0) + t.amount
             elif t.transaction_type in ['expense', 'fund_contribution']:
-                group_name = cat.parent_category or 'Other'
-                group_key = f'group_{group_name}'
+                group = cat.parent_category or 'Other'
+                if group not in expense_totals:
+                    expense_totals[group] = {}
+                if cat_name not in expense_totals[group]:
+                    cat_type = 'fund' if cat.type == 'fund' or t.transaction_type == 'fund_contribution' else 'expense'
+                    expense_totals[group][cat_name] = {'value': 0, 'type': cat_type}
+                expense_totals[group][cat_name]['value'] += t.amount
 
-                # Add group node if not exists
-                if group_key not in node_map:
-                    node_map[group_key] = len(nodes)
-                    nodes.append({'name': group_name, 'type': 'group'})
+        nodes = [{'name': 'Budget', 'type': 'budget'}]
+        links = []
+        node_map = {'Budget': 0}
 
-                # Add category node if not exists
-                node_type = 'fund' if cat.type == 'fund' or t.transaction_type == 'fund_contribution' else 'expense'
-                if cat_name not in node_map:
-                    node_map[cat_name] = len(nodes)
-                    nodes.append({'name': cat_name, 'type': node_type})
+        # Income nodes
+        for name, total in income_totals.items():
+            node_map[name] = len(nodes)
+            nodes.append({'name': name, 'type': 'income'})
+            links.append({'source': node_map[name], 'target': node_map['Budget'], 'value': total})
 
-                # Link from budget to group for this transaction
-                links.append({'source': node_map['Budget'], 'target': node_map[group_key], 'value': t.amount})
-                # Link from group to category for this transaction
-                links.append({'source': node_map[group_key], 'target': node_map[cat_name], 'value': t.amount})
+        # Deduction nodes
+        if deduction_totals:
+            node_map['Deductions'] = len(nodes)
+            nodes.append({'name': 'Deductions', 'type': 'deduction'})
+            total_deductions = sum(deduction_totals.values())
+            links.append({'source': node_map['Budget'], 'target': node_map['Deductions'], 'value': total_deductions})
+            for name, total in deduction_totals.items():
+                node_map[name] = len(nodes)
+                nodes.append({'name': name, 'type': 'deduction'})
+                links.append({'source': node_map['Deductions'], 'target': node_map[name], 'value': total})
+
+        # Expense and fund nodes grouped
+        for group in sorted(expense_totals.keys()):
+            group_key = f'group_{group}'
+            node_map[group_key] = len(nodes)
+            nodes.append({'name': group, 'type': 'group'})
+            group_total = sum(info['value'] for info in expense_totals[group].values())
+            links.append({'source': node_map['Budget'], 'target': node_map[group_key], 'value': group_total})
+            for cat_name, info in expense_totals[group].items():
+                node_map[cat_name] = len(nodes)
+                nodes.append({'name': cat_name, 'type': info['type']})
+                links.append({'source': node_map[group_key], 'target': node_map[cat_name], 'value': info['value']})
 
         return jsonify({'nodes': nodes, 'links': links})
     except Exception as e:
