@@ -1091,6 +1091,12 @@ def get_sankey_data(period, year_month=None):
                 income[t.category.name] = income.get(t.category.name, 0) + t.amount
             elif t.transaction_type == 'deduction':
                 deduction_total += t.amount
+            elif (
+                t.transaction_type == 'fund_contribution'
+                or (t.transaction_type == 'expense' and t.category.type == 'fund')
+            ):
+                # Treat fund contributions and fund-type expenses as savings flows
+                savings[t.category.name] = savings.get(t.category.name, 0) + t.amount
             elif t.transaction_type == 'expense':
                 group = t.category.parent_category
                 if group:
@@ -1103,8 +1109,6 @@ def get_sankey_data(period, year_month=None):
                     expense_groups[t.category.name] = (
                         expense_groups.get(t.category.name, 0) + t.amount
                     )
-            elif t.transaction_type == 'fund_contribution':
-                savings[t.category.name] = savings.get(t.category.name, 0) + t.amount
 
         nodes = []
         links = []
