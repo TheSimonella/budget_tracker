@@ -297,7 +297,7 @@
         
         const margin = {top: 40, right: 10, bottom: 40, left: 10};
         const width = $("#sankeyDiagram").width() - margin.left - margin.right;
-        const height = Math.max(400, data.nodes.length * 30) - margin.top - margin.bottom;
+        const height = Math.min(Math.max(400, data.nodes.length * 28), 700) - margin.top - margin.bottom;
         
         const svg = d3.select("#sankeyDiagram")
             .append("svg")
@@ -308,7 +308,7 @@
         
         const sankey = d3.sankey()
             .nodeWidth(15)
-            .nodePadding(20)
+            .nodePadding(30)
             .extent([[0, 0], [width, height]]);
         
         const {nodes, links} = sankey(data);

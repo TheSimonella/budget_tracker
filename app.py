@@ -1103,10 +1103,17 @@ def get_sankey_data(period, year_month=None):
                 links.append({'source': node_map[cat_name], 'target': node_map['Budget'], 'value': t.amount})
 
             elif t.transaction_type == 'deduction':
+                group_key = 'group_deductions'
+                if group_key not in node_map:
+                    node_map[group_key] = len(nodes)
+                    nodes.append({'name': 'Deductions', 'type': 'deduction'})
+
                 if cat_name not in node_map:
                     node_map[cat_name] = len(nodes)
                     nodes.append({'name': cat_name, 'type': 'deduction'})
-                links.append({'source': node_map['Budget'], 'target': node_map[cat_name], 'value': t.amount})
+
+                links.append({'source': node_map['Budget'], 'target': node_map[group_key], 'value': t.amount})
+                links.append({'source': node_map[group_key], 'target': node_map[cat_name], 'value': t.amount})
 
             elif t.transaction_type in ['expense', 'fund_contribution']:
                 group_name = cat.parent_category or 'Other'
