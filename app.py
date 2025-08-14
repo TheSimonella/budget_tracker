@@ -1114,30 +1114,34 @@ def get_sankey_data(period, year_month=None):
             node_map[key] = len(nodes)
             nodes.append({'name': name, 'type': ntype})
 
-        add_node('budget', 'Budget', 'budget')
+        # Single income source
+        add_node('income', 'Income', 'income')
 
-        for cat, amt in income.items():
-            add_node(f'income:{cat}', cat, 'income')
-            links.append({'source': node_map[f'income:{cat}'], 'target': node_map['budget'], 'value': amt})
-
+        # Deductions from income
         if deduction_total > 0:
             add_node('deductions', 'Deductions', 'deduction')
-            links.append({'source': node_map['budget'], 'target': node_map['deductions'], 'value': deduction_total})
+            links.append({'source': node_map['income'], 'target': node_map['deductions'], 'value': deduction_total})
 
+        # Expense groups and categories
         for grp, amt in expense_groups.items():
             grp_key = f'group:{grp}'
             add_node(grp_key, grp, 'expense')
-            links.append({'source': node_map['budget'], 'target': node_map[grp_key], 'value': amt})
+            links.append({'source': node_map['income'], 'target': node_map[grp_key], 'value': amt})
             if grp in expense_categories:
                 for cat, camt in expense_categories[grp].items():
                     cat_key = f'cat:{grp}:{cat}'
                     add_node(cat_key, cat, 'expense')
                     links.append({'source': node_map[grp_key], 'target': node_map[cat_key], 'value': camt})
 
-        for fund, amt in savings.items():
-            fund_key = f'fund:{fund}'
-            add_node(fund_key, fund, 'fund')
-            links.append({'source': node_map['budget'], 'target': node_map[fund_key], 'value': amt})
+        # Savings grouped under a single node
+        if savings:
+            add_node('savings', 'Savings', 'fund')
+            total_savings = sum(savings.values())
+            links.append({'source': node_map['income'], 'target': node_map['savings'], 'value': total_savings})
+            for fund, amt in savings.items():
+                fund_key = f'fund:{fund}'
+                add_node(fund_key, fund, 'fund')
+                links.append({'source': node_map['savings'], 'target': node_map[fund_key], 'value': amt})
 
         return jsonify({'nodes': nodes, 'links': links})
     except Exception as e:

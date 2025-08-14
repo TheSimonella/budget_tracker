@@ -305,13 +305,14 @@
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
-        
+
         const sankey = d3.sankey()
-            .nodeWidth(15)
-            .nodePadding(24)
-            .nodeAlign(d3.sankeyCenter)
+            .nodeWidth(20)
+            .nodePadding(36)
+            .nodeAlign(d3.sankeyJustify)
             .nodeSort(null)
             .linkSort(null)
+            .iterations(64)
             .extent([[0, 0], [width, height]]);
 
         const {nodes, links} = sankey(data);
@@ -322,9 +323,8 @@
             const name = node.name || node;
             if (name === 'Income') return 'income';
             if (name === 'Deductions') return 'deduction';
-            if (name === 'Expenses') return 'expense';
             if (name === 'Savings') return 'fund';
-            if (name === 'Budget') return 'budget';
+            if (name === 'Expenses') return 'expense';
             return 'other';
         }
 
@@ -341,7 +341,7 @@
                 if (targetType === "fund") return "#2a9d8f";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => d.width * 5)
+            .attr("stroke-width", d => Math.max(2, d.width * 8))
             .attr("fill", "none")
             .attr("opacity", 0.6);
         
@@ -362,8 +362,7 @@
                 if (type === "deduction") return "#f77f00";
                 if (type === "expense") return "#dc3545";
                 if (type === "fund") return "#2a9d8f";
-                if (type === "budget") return "#6c757d";
-                return "#999";
+                return "#6c757d";
             });
         
         node.append("text")
