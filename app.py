@@ -1081,18 +1081,28 @@ def get_sankey_data(period, year_month=None):
         ).all()
 
         income = {}
-        deductions = {}
-        expenses = {}
+        deduction_total = 0
+        expense_groups = {}
+        expense_categories = {}
         savings = {}
 
         for t in transactions:
             if t.transaction_type == 'income':
                 income[t.category.name] = income.get(t.category.name, 0) + t.amount
             elif t.transaction_type == 'deduction':
-                deductions[t.category.name] = deductions.get(t.category.name, 0) + t.amount
+                deduction_total += t.amount
             elif t.transaction_type == 'expense':
-                group = t.category.parent_category or t.category.name
-                expenses[group] = expenses.get(group, 0) + t.amount
+                group = t.category.parent_category
+                if group:
+                    expense_groups[group] = expense_groups.get(group, 0) + t.amount
+                    expense_categories.setdefault(group, {})
+                    expense_categories[group][t.category.name] = (
+                        expense_categories[group].get(t.category.name, 0) + t.amount
+                    )
+                else:
+                    expense_groups[t.category.name] = (
+                        expense_groups.get(t.category.name, 0) + t.amount
+                    )
             elif t.transaction_type == 'fund_contribution':
                 savings[t.category.name] = savings.get(t.category.name, 0) + t.amount
 
@@ -1108,15 +1118,19 @@ def get_sankey_data(period, year_month=None):
             nodes.append({'name': cat, 'type': 'income'})
             links.append({'source': node_map[cat], 'target': node_map['Budget'], 'value': amt})
 
-        for cat, amt in deductions.items():
-            node_map[cat] = len(nodes)
-            nodes.append({'name': cat, 'type': 'deduction'})
-            links.append({'source': node_map['Budget'], 'target': node_map[cat], 'value': amt})
-
-        for grp, amt in expenses.items():
+        if deduction_total > 0:
+            node_map['Deductions'] = len(nodes)
+            nodes.append({'name': 'Deductions', 'type': 'deduction'})
+            links.append({'source': node_map['Budget'], 'target': node_map['Deductions'], 'value': deduction_total})
+        for grp, amt in expense_groups.items():
             node_map[grp] = len(nodes)
             nodes.append({'name': grp, 'type': 'expense'})
             links.append({'source': node_map['Budget'], 'target': node_map[grp], 'value': amt})
+            if grp in expense_categories:
+                for cat, camt in expense_categories[grp].items():
+                    node_map[cat] = len(nodes)
+                    nodes.append({'name': cat, 'type': 'expense'})
+                    links.append({'source': node_map[grp], 'target': node_map[cat], 'value': camt})
 
         for fund, amt in savings.items():
             node_map[fund] = len(nodes)

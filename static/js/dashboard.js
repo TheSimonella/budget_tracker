@@ -297,7 +297,7 @@
         
         const margin = {top: 10, right: 10, bottom: 10, left: 10};
         const width = $("#sankeyDiagram").width() - margin.left - margin.right;
-        const height = 330 - margin.top - margin.bottom;
+        const height = $("#sankeyDiagram").height() - margin.top - margin.bottom;
         
         const svg = d3.select("#sankeyDiagram")
             .append("svg")
@@ -307,8 +307,11 @@
             .attr("transform", `translate(${margin.left},${margin.top})`);
         
         const sankey = d3.sankey()
-            .nodeWidth(15)
-            .nodePadding(10)
+            .nodeWidth(20)
+            .nodePadding(20)
+            .nodeAlign(d3.sankeyCenter)
+            .nodeSort(null)
+            .linkSort(null)
             .extent([[0, 0], [width, height]]);
 
         const {nodes, links} = sankey(data);
@@ -338,9 +341,9 @@
                 if (targetType === "fund") return "#2a9d8f";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => Math.max(1, d.width))
+            .attr("stroke-width", d => Math.max(3, d.width * 1.5))
             .attr("fill", "none")
-            .attr("opacity", 0.5);
+            .attr("opacity", 0.6);
         
         // Add nodes
         const node = svg.append("g")
