@@ -309,6 +309,7 @@
         const sankey = d3.sankey()
             .nodeWidth(15)
             .nodePadding(10)
+            .nodeAlign(d3.sankeyCenter)
             .extent([[0, 0], [width, height]]);
         
         const {nodes, links} = sankey(data);
