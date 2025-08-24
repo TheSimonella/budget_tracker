@@ -86,80 +86,72 @@ function showReport(reportType) {
         localStorage.setItem('selectedMonth', selectedMonth);
 
         $.get(`/api/reports/monthly-summary/${selectedMonth}`, function(data) {
-    let incomeHtml = '<h5>Income Breakdown</h5><table class="table table-sm"><tbody>';
-    for (const [category, amount] of Object.entries(data.income_breakdown)) {
-        incomeHtml += `<tr><td>${category}</td><td class="text-end">${formatCurrency(amount)}</td></tr>`;
-    }
-    incomeHtml += `<tr class="fw-bold"><td>Total Gross Income</td><td class="text-end">${formatCurrency(data.gross_income)}</td></tr>`;
-    incomeHtml += '</tbody></table>';
-
-    let deductionHtml = '<h5 class="mt-4">Deduction Breakdown</h5><table class="table table-sm"><tbody>';
-    for (const [category, amount] of Object.entries(data.deduction_breakdown)) {
-        deductionHtml += `<tr><td>${category}</td><td class="text-end">-${formatCurrency(amount)}</td></tr>`;
-    }
-    deductionHtml += `<tr class="fw-bold text-danger"><td>Total Deductions</td><td class="text-end">-${formatCurrency(data.deductions)}</td></tr>`;
-    deductionHtml += '</tbody></table>';
-
-    let expenseHtml = '<h5 class="mt-4">Expense Breakdown</h5><table class="table table-sm"><tbody>';
-    for (const [category, amount] of Object.entries(data.expense_breakdown)) {
-        expenseHtml += `<tr><td>${category}</td><td class="text-end">${formatCurrency(amount)}</td></tr>`;
-    }
-    expenseHtml += `<tr class="fw-bold table-danger"><td>Total Expenses</td><td class="text-end">${formatCurrency(data.total_expenses)}</td></tr>`;
-    expenseHtml += '</tbody></table>';
-
-    const summaryHtml = `
-        <div class="row mt-4">
-            <div class="col-md-6">
-                ${incomeHtml}
-                ${deductionHtml}
-                ${expenseHtml}
-            </div>
-            <div class="col-md-6">
-                <h5>Summary</h5>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Net Income:</span>
-                            <strong class="text-primary">${formatCurrency(data.net_income)}</strong>
+            let incomeHtml = '<h5>Income Breakdown</h5><table class="table table-sm"><tbody>';
+            
+            for (const [category, amount] of Object.entries(data.income_breakdown)) {
+                incomeHtml += `<tr><td>${category}</td><td class="text-end">${formatCurrency(amount)}</td></tr>`;
+            }
+            incomeHtml += `<tr class="fw-bold"><td>Total Gross Income</td><td class="text-end">${formatCurrency(data.gross_income)}</td></tr>`;
+            incomeHtml += `<tr class="text-danger"><td>Total Deductions</td><td class="text-end">-${formatCurrency(data.deductions)}</td></tr>`;
+            incomeHtml += `<tr class="fw-bold table-primary"><td>Net Income</td><td class="text-end">${formatCurrency(data.net_income)}</td></tr>`;
+            incomeHtml += '</tbody></table>';
+            
+            let expenseHtml = '<h5 class="mt-4">Expense Breakdown</h5><table class="table table-sm"><tbody>';
+            for (const [category, amount] of Object.entries(data.expense_breakdown)) {
+                expenseHtml += `<tr><td>${category}</td><td class="text-end">${formatCurrency(amount)}</td></tr>`;
+            }
+            expenseHtml += `<tr class="fw-bold table-danger"><td>Total Expenses</td><td class="text-end">${formatCurrency(data.total_expenses)}</td></tr>`;
+            expenseHtml += '</tbody></table>';
+            
+            const summaryHtml = `
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        ${incomeHtml}
+                        ${expenseHtml}
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Summary</h5>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Net Income:</span>
+                                    <strong class="text-primary">${formatCurrency(data.net_income)}</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Total Expenses:</span>
+                                    <strong class="text-danger">-${formatCurrency(data.total_expenses)}</strong>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Monthly Savings:</span>
+                                    <strong class="${data.savings >= 0 ? 'text-success' : 'text-danger'}">${formatCurrency(data.savings)}</strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Savings Rate:</span>
+                                    <strong class="${data.savings_rate >= 20 ? 'text-success' : data.savings_rate >= 10 ? 'text-warning' : 'text-danger'}">
+                                        ${data.savings_rate.toFixed(1)}%
+                                    </strong>
+                                </div>
+                            </div>
                         </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Total Expenses:</span>
-                            <strong class="text-danger">-${formatCurrency(data.total_expenses)}</strong>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Total Savings:</span>
-                            <strong class="text-success">${formatCurrency(data.total_savings)}</strong>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Left Over:</span>
-                            <strong>${formatCurrency(data.leftover)}</strong>
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-between">
-                            <span>Savings Rate:</span>
-                            <strong class="${data.savings_rate >= 20 ? 'text-success' : data.savings_rate >= 10 ? 'text-warning' : 'text-danger'}">${data.savings_rate.toFixed(1)}%</strong>
+                        
+                        <div class="alert ${data.savings_rate >= 20 ? 'alert-success' : data.savings_rate >= 10 ? 'alert-warning' : 'alert-danger'} mt-3">
+                            <h6>Savings Analysis</h6>
+                            ${data.savings_rate >= 20 ? 
+                                `Great job! You're saving ${data.savings_rate.toFixed(1)}% of your income. Keep it up!` :
+                                data.savings_rate >= 10 ?
+                                `You're saving ${data.savings_rate.toFixed(1)}% of your income. Consider increasing this to 20% or more for better financial security.` :
+                                `Your savings rate is only ${data.savings_rate.toFixed(1)}%. Try to reduce expenses or increase income to improve your financial health.`
+                            }
                         </div>
                     </div>
                 </div>
-
-                <div class="alert ${data.savings_rate >= 20 ? 'alert-success' : data.savings_rate >= 10 ? 'alert-warning' : 'alert-danger'} mt-3">
-                    <h6>Savings Analysis</h6>
-                    ${data.savings_rate >= 20 ?
-                        `Great job! You're saving ${data.savings_rate.toFixed(1)}% of your income. Keep it up!` :
-                        data.savings_rate >= 10 ?
-                        `You're saving ${data.savings_rate.toFixed(1)}% of your income. Consider increasing this to 20% or more for better financial security.` :
-                        `Your savings rate is only ${data.savings_rate.toFixed(1)}%. Try to reduce expenses or increase income to improve your financial health.`
-                    }
-                </div>
-            </div>
-        </div>
-    `;
-
-    $('#monthlySummaryContent').html(summaryHtml);
-}).fail(function() {
-    $('#monthlySummaryContent').html('<div class="alert alert-warning">No data available for the selected month.</div>');
-});
-
+            `;
+            
+            $('#monthlySummaryContent').html(summaryHtml);
+        }).fail(function() {
+            $('#monthlySummaryContent').html('<div class="alert alert-warning">No data available for the selected month.</div>');
+        });
     }
     
     function loadAnnualOverview() {

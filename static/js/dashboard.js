@@ -122,7 +122,7 @@
                 if (!expensesByParent[parent]) expensesByParent[parent] = [];
                 expensesByParent[parent].push(cat);
             });
-
+            
             Object.keys(expensesByParent).sort().forEach(parent => {
                 select.append(`<optgroup label="${parent}">`);
                 expensesByParent[parent].forEach(cat => {
@@ -130,8 +130,8 @@
                 });
                 select.append('</optgroup>');
             });
-        } else if (transactionType === 'fund_contribution' || transactionType === 'fund_withdrawal') {
-            const fundCategories = categories.filter(c => c.type === 'fund');
+        } else if (transactionType === 'fund_withdrawal') {
+            const fundCategories = categories.filter(c => c.parent_category === 'Savings');
             fundCategories.forEach(cat => {
                 select.append(`<option value="${cat.id}">${cat.name}</option>`);
             });
@@ -297,7 +297,7 @@
         
         const margin = {top: 10, right: 10, bottom: 10, left: 10};
         const width = $("#sankeyDiagram").width() - margin.left - margin.right;
-        const height = $("#sankeyDiagram").height() - margin.top - margin.bottom;
+        const height = 330 - margin.top - margin.bottom;
         
         const svg = d3.select("#sankeyDiagram")
             .append("svg")
@@ -305,35 +305,14 @@
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
-
-        const typeOrder = { deduction: 0, fund: 1, expense: 2, income: 3, other: 4 };
-
+        
         const sankey = d3.sankey()
             .nodeWidth(15)
-            .nodePadding(20)
+            .nodePadding(10)
             .nodeAlign(d3.sankeyCenter)
-            .nodeSort((a, b) => {
-                const ta = typeOrder[a.type] ?? 99;
-                const tb = typeOrder[b.type] ?? 99;
-                return ta - tb || d3.ascending(a.name, b.name);
-            })
-            .linkSort(null)
             .extent([[0, 0], [width, height]]);
-
-        const graph = sankey(data);
-
-        // Center graph vertically so flows expand evenly up and down
-        const yExtent = d3.extent(graph.nodes.flatMap(n => [n.y0, n.y1]));
-        const offset = (height - (yExtent[1] - yExtent[0])) / 2;
-        if (offset > 0) {
-            graph.nodes.forEach(n => {
-                n.y0 += offset;
-                n.y1 += offset;
-            });
-            sankey.update(graph);
-        }
-
-        const {nodes, links} = graph;
+        
+        const {nodes, links} = sankey(data);
 
         // Determine node type for coloring
         function getNodeType(node) {
@@ -341,11 +320,12 @@
             const name = node.name || node;
             if (name === 'Income') return 'income';
             if (name === 'Deductions') return 'deduction';
-            if (name === 'Savings') return 'fund';
             if (name === 'Expenses') return 'expense';
+            if (name === 'Savings') return 'fund';
+            if (name === 'Budget') return 'budget';
             return 'other';
         }
-
+        
         // Add links
         svg.append("g")
             .selectAll("path")
@@ -356,10 +336,10 @@
                 const targetType = getNodeType(d.target);
                 if (targetType === "deduction") return "#f77f00";
                 if (targetType === "expense") return "#dc3545";
-                if (targetType === "fund") return "#28a745";
+                if (targetType === "fund") return "#2a9d8f";
                 return "#4361ee";
             })
-            .attr("stroke-width", d => Math.max(2, d.width * 1.5))
+            .attr("stroke-width", d => Math.max(1, d.width))
             .attr("fill", "none")
             .attr("opacity", 0.5);
         
@@ -379,8 +359,9 @@
                 if (type === "income") return "#4361ee";
                 if (type === "deduction") return "#f77f00";
                 if (type === "expense") return "#dc3545";
-                if (type === "fund") return "#28a745";
-                return "#6c757d";
+                if (type === "fund") return "#2a9d8f";
+                if (type === "budget") return "#6c757d";
+                return "#999";
             });
         
         node.append("text")

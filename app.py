@@ -155,15 +155,8 @@ def get_dashboard_data(year_month):
         gross_income = sum(t.amount for t in transactions if t.transaction_type == 'income')
         deductions = sum(t.amount for t in transactions if t.transaction_type == 'deduction')
         net_income = gross_income - deductions
-        total_expenses = sum(
-            t.amount for t in transactions
-            if t.transaction_type == 'expense' and (t.category.type != 'fund')
-        )
-        total_savings = sum(
-            t.amount for t in transactions
-            if t.transaction_type == 'fund_contribution' or
-               (t.transaction_type == 'expense' and t.category.type == 'fund')
-        )
+        total_expenses = sum(t.amount for t in transactions if t.transaction_type == 'expense')
+        total_savings = sum(t.amount for t in transactions if t.transaction_type == 'fund_contribution')
         
         # Get funds data
         funds = Fund.query.all()
@@ -525,7 +518,6 @@ def list_transactions():
             'type': t.transaction_type,
             'category': t.category.name,
             'category_id': t.category_id,
-            'category_type': t.category.type,
             'merchant': t.merchant,
             'date': t.date.isoformat(),
             'description': t.description,
@@ -1061,20 +1053,24 @@ def budget_comparison(year_month):
 @app.route('/api/sankey-data/<period>/<year_month>')
 def get_sankey_data(period, year_month=None):
     try:
+        # If no year_month provided, use current month
         if year_month is None:
             now = datetime.now()
             year = now.year
             month = now.month
         else:
             year, month = map(int, year_month.split('-'))
-
+        
         if period == 'monthly':
             start_date = datetime(year, month, 1).date()
-            end_date = datetime(year + (month // 12), ((month % 12) + 1), 1).date()
+            if month == 12:
+                end_date = datetime(year + 1, 1, 1).date()
+            else:
+                end_date = datetime(year, month + 1, 1).date()
         else:  # annual
             start_date = datetime(year, 1, 1).date()
             end_date = datetime(year + 1, 1, 1).date()
-
+        
         transactions = Transaction.query.filter(
             Transaction.date >= start_date,
             Transaction.date < end_date
@@ -1082,8 +1078,7 @@ def get_sankey_data(period, year_month=None):
 
         income = {}
         deduction_total = 0
-        expense_groups = {}
-        expense_categories = {}
+        expenses = {}
         savings = {}
 
         for t in transactions:
@@ -1091,67 +1086,42 @@ def get_sankey_data(period, year_month=None):
                 income[t.category.name] = income.get(t.category.name, 0) + t.amount
             elif t.transaction_type == 'deduction':
                 deduction_total += t.amount
-            elif (
-                t.transaction_type == 'fund_contribution'
-                or (t.transaction_type == 'expense' and t.category.type == 'fund')
-            ):
-                # Treat fund contributions and fund-type expenses as savings flows
-                savings[t.category.name] = savings.get(t.category.name, 0) + t.amount
             elif t.transaction_type == 'expense':
-                group = t.category.parent_category
-                if group:
-                    expense_groups[group] = expense_groups.get(group, 0) + t.amount
-                    expense_categories.setdefault(group, {})
-                    expense_categories[group][t.category.name] = (
-                        expense_categories[group].get(t.category.name, 0) + t.amount
-                    )
-                else:
-                    expense_groups[t.category.name] = (
-                        expense_groups.get(t.category.name, 0) + t.amount
-                    )
+                expenses[t.category.name] = expenses.get(t.category.name, 0) + t.amount
+            elif t.transaction_type == 'fund_contribution':
+                savings[t.category.name] = savings.get(t.category.name, 0) + t.amount
 
         nodes = []
         links = []
         node_map = {}
 
-        def add_node(key, name, ntype):
-            node_map[key] = len(nodes)
-            nodes.append({'name': name, 'type': ntype})
+        node_map['Budget'] = len(nodes)
+        nodes.append({'name': 'Budget', 'type': 'budget'})
 
-        # Income sources and aggregated Income node
-        add_node('income', 'Income', 'income')
-        for src, amt in income.items():
-            src_key = f'income:{src}'
-            add_node(src_key, src, 'income')
-            links.append({'source': node_map[src_key], 'target': node_map['income'], 'value': amt})
+        for cat, amt in income.items():
+            node_map[cat] = len(nodes)
+            nodes.append({'name': cat, 'type': 'income'})
+            links.append({'source': node_map[cat], 'target': node_map['Budget'], 'value': amt})
 
-        # Deductions from income
         if deduction_total > 0:
-            add_node('deductions', 'Deductions', 'deduction')
-            links.append({'source': node_map['income'], 'target': node_map['deductions'], 'value': deduction_total})
+            node_map['Deductions'] = len(nodes)
+            nodes.append({'name': 'Deductions', 'type': 'deduction'})
+            links.append({'source': node_map['Budget'], 'target': node_map['Deductions'], 'value': deduction_total})
 
-        # Expense groups and categories
-        for grp, amt in expense_groups.items():
-            grp_key = f'group:{grp}'
-            add_node(grp_key, grp, 'expense')
-            links.append({'source': node_map['income'], 'target': node_map[grp_key], 'value': amt})
-            if grp in expense_categories:
-                for cat, camt in expense_categories[grp].items():
-                    cat_key = f'cat:{grp}:{cat}'
-                    add_node(cat_key, cat, 'expense')
-                    links.append({'source': node_map[grp_key], 'target': node_map[cat_key], 'value': camt})
+        for cat, amt in expenses.items():
+            node_map[cat] = len(nodes)
+            nodes.append({'name': cat, 'type': 'expense'})
+            links.append({'source': node_map['Budget'], 'target': node_map[cat], 'value': amt})
 
-        # Savings grouped under a single node
-        if savings:
-            add_node('savings', 'Savings', 'fund')
-            total_savings = sum(savings.values())
-            links.append({'source': node_map['income'], 'target': node_map['savings'], 'value': total_savings})
-            for fund, amt in savings.items():
-                fund_key = f'fund:{fund}'
-                add_node(fund_key, fund, 'fund')
-                links.append({'source': node_map['savings'], 'target': node_map[fund_key], 'value': amt})
+        for fund, amt in savings.items():
+            node_map[fund] = len(nodes)
+            nodes.append({'name': fund, 'type': 'fund'})
+            links.append({'source': node_map['Budget'], 'target': node_map[fund], 'value': amt})
 
-        return jsonify({'nodes': nodes, 'links': links})
+        return jsonify({
+            'nodes': nodes,
+            'links': links
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1177,44 +1147,37 @@ def get_monthly_summary_report(year_month):
         
         # Group by category
         income_by_category = {}
-        deduction_by_category = {}
         expense_by_category = {}
-        savings_by_category = {}
 
         for trans in transactions:
-            cat = trans.category
-            if trans.transaction_type == 'income':
-                income_by_category[cat.name] = income_by_category.get(cat.name, 0) + trans.amount
-            elif trans.transaction_type == 'deduction':
-                deduction_by_category[cat.name] = deduction_by_category.get(cat.name, 0) + trans.amount
-            elif cat.type == 'fund' or trans.transaction_type == 'fund_contribution':
-                savings_by_category[cat.name] = savings_by_category.get(cat.name, 0) + trans.amount
+            if trans.transaction_type in ['income', 'deduction']:
+                if trans.category.name not in income_by_category:
+                    income_by_category[trans.category.name] = 0
+                income_by_category[trans.category.name] += trans.amount
             elif trans.transaction_type == 'expense':
-                parent = cat.parent_category or cat.name
-                expense_by_category[parent] = expense_by_category.get(parent, 0) + trans.amount
-
+                parent = trans.category.parent_category or trans.category.name
+                if parent not in expense_by_category:
+                    expense_by_category[parent] = 0
+                expense_by_category[parent] += trans.amount
+        
         # Calculate totals
-        gross_income = sum(income_by_category.values())
-        deductions = sum(deduction_by_category.values())
+        gross_income = sum(t.amount for t in transactions if t.transaction_type == 'income')
+        deductions = sum(t.amount for t in transactions if t.transaction_type == 'deduction')
         net_income = gross_income - deductions
         total_expenses = sum(expense_by_category.values())
-        total_savings = sum(savings_by_category.values())
-        savings_rate = (total_savings / net_income * 100) if net_income > 0 else 0
-        leftover = net_income - total_expenses - total_savings
-
+        savings = net_income - total_expenses
+        savings_rate = (savings / net_income * 100) if net_income > 0 else 0
+        
         return jsonify({
             'month': f"{calendar.month_name[month]} {year}",
             'income_breakdown': income_by_category,
-            'deduction_breakdown': deduction_by_category,
             'expense_breakdown': expense_by_category,
-            'savings_breakdown': savings_by_category,
             'gross_income': gross_income,
             'deductions': deductions,
             'net_income': net_income,
             'total_expenses': total_expenses,
-            'total_savings': total_savings,
-            'savings_rate': savings_rate,
-            'leftover': leftover
+            'savings': savings,
+            'savings_rate': savings_rate
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
